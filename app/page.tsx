@@ -5,7 +5,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useOmni } from "@/hooks/useOmni";
 import { useAudioLevel } from "@/hooks/useAudioLevel";
 import { OmniOrb } from "@/components/OmniOrb";
-import { STATUS_LABEL } from "@/lib/types";
 
 export default function Home() {
   const {
@@ -21,6 +20,7 @@ export default function Home() {
   const micActive = awake && (status === "listening" || status === "responding");
   const { level } = useAudioLevel(micActive);
   const [draft, setDraft] = useState("");
+  const [menu, setMenu] = useState(false); // 구체 호버/터치 시 액션 메뉴
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,28 +33,44 @@ export default function Home() {
 
   return (
     <main className="relative mx-auto flex min-h-screen w-full max-w-2xl flex-col items-center justify-between px-4 py-8 sm:px-5 sm:py-10">
-      {/* 상단: 구체 + 라벨 + 상태 */}
-      <section className="flex flex-1 flex-col items-center justify-center gap-5">
-        <OmniOrb status={status} level={level} onClick={toggleAwake} />
+      {/* 타이틀 — 좌상단 고정 */}
+      <span className="absolute left-5 top-5 text-[13px] font-light tracking-[0.45em] text-sky-300/90">
+        O M N I
+      </span>
 
-        <div className="flex flex-col items-center gap-1.5">
-          <span className="text-[13px] font-light tracking-[0.45em] text-sky-300/90">
-            O M N I
-          </span>
-          <span className="text-[11px] tracking-[0.2em] text-sky-400/40">
-            {awake ? STATUS_LABEL[status] : "TAP TO WAKE"}
-          </span>
-          <a
-            href="/vision"
-            className="mt-1 rounded-full border border-sky-400/25 px-3 py-1 text-[10px] tracking-[0.25em] text-sky-300/60 transition hover:border-sky-400/60 hover:text-sky-200"
+      {/* 중앙: 구체 (밑에 텍스트 없음) + 호버 시 VISION/CHAT 메뉴 */}
+      <section className="flex flex-1 items-center justify-center">
+        <div
+          className="relative"
+          onMouseEnter={() => setMenu(true)}
+          onMouseLeave={() => setMenu(false)}
+        >
+          <OmniOrb status={status} level={level} onClick={() => setMenu((m) => !m)} />
+
+          {/* 호버/터치 시 옆(데스크톱)·아래(모바일)에 뜨는 액션 버튼 */}
+          <div
+            className={`absolute z-20 flex gap-2 transition-all duration-300
+              left-1/2 top-full mt-3 -translate-x-1/2 flex-row
+              sm:left-full sm:top-1/2 sm:ml-4 sm:mt-0 sm:-translate-x-0 sm:-translate-y-1/2 sm:flex-col
+              ${menu ? "opacity-100" : "pointer-events-none opacity-0"}`}
           >
-            VISION ↗ 손 인식 모드
-          </a>
-        </div>
-
-        {/* 실시간 음성 인식 자막 */}
-        <div className="h-5 text-center text-sm text-sky-300/70">
-          {interim && <span>“{interim}”</span>}
+            <button
+              onClick={toggleAwake}
+              className={`rounded-xl border px-4 py-2 text-xs tracking-[0.2em] backdrop-blur transition ${
+                awake
+                  ? "border-sky-400/60 bg-sky-500/20 text-sky-100"
+                  : "border-white/15 bg-white/[0.06] text-slate-200 hover:border-sky-400/50 hover:text-sky-100"
+              }`}
+            >
+              {awake ? "● CHAT" : "CHAT"}
+            </button>
+            <a
+              href="/vision"
+              className="rounded-xl border border-white/15 bg-white/[0.06] px-4 py-2 text-xs tracking-[0.2em] text-slate-200 backdrop-blur transition hover:border-sky-400/50 hover:text-sky-100"
+            >
+              VISION
+            </a>
+          </div>
         </div>
       </section>
 
@@ -84,6 +100,10 @@ export default function Home() {
 
       {/* 하단: 입력창 (가시성 강화) + SEND + 음성 토글 */}
       <section className="w-full">
+        {/* 실시간 음성 인식 자막 */}
+        <div className="mb-1.5 h-5 text-center text-sm text-sky-300/70">
+          {interim && <span>“{interim}”</span>}
+        </div>
         {!supported && (
           <p className="mb-2 text-center text-xs text-amber-400/70">
             이 브라우저는 음성 인식을 지원하지 않습니다. 입력창으로 명령하세요.
