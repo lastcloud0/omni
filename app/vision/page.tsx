@@ -7,8 +7,10 @@ import { useDraggable } from "@/hooks/useDraggable";
 import type { HandFrame } from "@/hooks/useHandTracking";
 import type { LinkNode } from "@/lib/linkNodes";
 
-// 핀치 변화량 → 카메라 거리 변화에 곱하는 이득. 클수록 줌이 민감.
-const ZOOM_GAIN = 12;
+// 줌 제어 (핀치 정도 = 줌 속도, 중간값이 브레이크)
+const PINCH_NEUTRAL = 0.13; // 이 핀치값이 중립(정지). 이보다 작으면(오므림) 줌인, 크면(펴기) 줌아웃
+const ZOOM_DEAD = 0.025; // 중립 주변 브레이크 구간
+const ZOOM_SPEED = 0.9; // 줌 속도 이득
 // 손 비틀기 회전 제어
 const SPIN_DEAD = 0.28; // 브레이크 중립 구간(라디안, ±약 16°)
 const SPIN_GAIN = 0.06; // 기울인 각도 → 회전 속도 비례
@@ -21,7 +23,6 @@ export default function VisionPage() {
 
   // 카메라 거리(=줌). 작아질수록 줌인. ParticleField가 ref로 읽음.
   const camRef = useRef(3.0);
-  const lastPinch = useRef<number | null>(null);
   // 손 비틀기 → yaw 회전 "속도". null이면 자동회전.
   const spinRef = useRef<number | null>(null);
   // 노드 상호작용용
@@ -38,14 +39,17 @@ export default function VisionPage() {
     if (f.detected) {
       pinchRef.current = f.pinch;
 
-      // 줌: 핀치 변화량 (노드 호버 중이면 억제 → 선택 의도)
+      // 줌(속도+브레이크): 핀치 중립=정지, 꽉=줌인, 펴기=줌아웃.
+      // 노드 호버 중이면 줌 억제(핀치=선택 의도).
       const overNode = hoverRef.current != null;
-      if (lastPinch.current != null && !overNode) {
-        const delta = f.pinch - lastPinch.current;
-        camRef.current += delta * ZOOM_GAIN;
-        camRef.current = Math.max(0.5, Math.min(3.4, camRef.current));
+      if (!overNode) {
+        const off = f.pinch - PINCH_NEUTRAL; // 음수=오므림(줌인), 양수=펴기(줌아웃)
+        if (Math.abs(off) > ZOOM_DEAD) {
+          const eff = off - Math.sign(off) * ZOOM_DEAD;
+          camRef.current += eff * ZOOM_SPEED; // 오므림(off<0) → cam 감소 → 줌인
+          camRef.current = Math.max(0.5, Math.min(3.4, camRef.current));
+        }
       }
-      lastPinch.current = f.pinch;
 
       // 포인터(셀렉용): 손 위치, 거울모드
       const pt = f.pointer ?? f.landmarks[9] ?? null;
@@ -69,10 +73,9 @@ export default function VisionPage() {
         }
       }
     } else {
-      lastPinch.current = null;
       spinRef.current = null; // 손 없으면 자동회전
       pointerRef.current = null;
-      pinchRef.current = 1;
+      pinchRef.current = PINCH_NEUTRAL; // 중립 → 줌 정지
     }
   };
 
