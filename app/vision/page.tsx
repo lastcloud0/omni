@@ -16,18 +16,34 @@ export default function VisionPage() {
   // 카메라 거리(=줌). 작아질수록 줌인. ParticleField가 ref로 읽음.
   const camRef = useRef(3.0);
   const lastPinch = useRef<number | null>(null);
+  // 손 위치 기반 회전 목표. null이면 자동회전.
+  const rotRef = useRef<{ yaw: number; pitch: number } | null>(null);
 
   const onFrame = (f: HandFrame) => {
     setFrame(f);
     if (f.detected) {
+      // 줌: 핀치 변화량 → 카메라 거리
       if (lastPinch.current != null) {
         const delta = f.pinch - lastPinch.current; // 음수면 오므리는 중 → 줌인
         camRef.current += delta * ZOOM_GAIN;
         camRef.current = Math.max(0.5, Math.min(3.4, camRef.current));
       }
       lastPinch.current = f.pinch;
+
+      // 회전: 손 위치(거울모드 X, Y)를 화면 중앙 기준으로 → yaw/pitch
+      const pt = f.pointer ?? f.landmarks[9] ?? null;
+      if (pt) {
+        const mx = 1 - pt.x; // 거울모드
+        const my = pt.y;
+        // 중앙(0.5) 기준 -0.5..0.5 → 회전 범위(±약 130°)
+        rotRef.current = {
+          yaw: (mx - 0.5) * 4.4,
+          pitch: (my - 0.5) * -3.0, // 손 올리면 위로 보임
+        };
+      }
     } else {
       lastPinch.current = null;
+      rotRef.current = null; // 손 내리면 자동회전 복귀
     }
   };
 
@@ -44,7 +60,7 @@ export default function VisionPage() {
     <main className="relative h-screen w-screen overflow-hidden">
       {/* 전체 화면 파티클 (프레임 없음) */}
       <div className="absolute inset-0">
-        <ParticleField camRef={camRef} count={900} />
+        <ParticleField camRef={camRef} rotRef={rotRef} count={900} />
       </div>
 
       {/* 손 포인터 (전체 화면 기준) */}

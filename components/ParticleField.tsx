@@ -5,6 +5,8 @@ import { useEffect, useRef } from "react";
 interface Props {
   /** 카메라 거리(=줌). 값이 작아질수록 구체 안으로 줌인. 부모가 ref로 제어. */
   camRef: React.MutableRefObject<number>;
+  /** 목표 회전 각(라디안). yaw=좌우(Y축), pitch=상하(X축). null이면 자동회전. */
+  rotRef?: React.MutableRefObject<{ yaw: number; pitch: number } | null>;
   count?: number;
 }
 
@@ -18,7 +20,7 @@ const CAM_MAX = 3.4; // 최대 줌아웃
  * - camRef(카메라 거리)로 줌 인/아웃
  * 가벼움: Three.js 없이 순수 canvas. count 기본 900.
  */
-export function ParticleField({ camRef, count = 900 }: Props) {
+export function ParticleField({ camRef, rotRef, count = 900 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -50,30 +52,44 @@ export function ParticleField({ camRef, count = 900 }: Props) {
     window.addEventListener("resize", resize);
 
     let cam = camRef.current; // 부드럽게 따라갈 내부 카메라
-    let angle = 0;
+    let yaw = 0; // 좌우 회전(Y축)
+    let pitch = 0; // 상하 회전(X축)
     let raf = 0;
 
     const draw = () => {
       const target = Math.max(CAM_MIN, Math.min(CAM_MAX, camRef.current));
       cam += (target - cam) * 0.18; // 스무딩
-      angle += 0.0022;
+
+      // 손이 조종 중이면 목표 각으로 추종, 아니면 자동회전(yaw 증가, pitch→0)
+      const rot = rotRef?.current ?? null;
+      if (rot) {
+        yaw += (rot.yaw - yaw) * 0.15;
+        pitch += (rot.pitch - pitch) * 0.15;
+      } else {
+        yaw += 0.0022; // 자동 회전
+        pitch += (0 - pitch) * 0.05; // 천천히 수평 복귀
+      }
 
       ctx.clearRect(0, 0, W, H);
       const cx = W / 2;
       const cy = H / 2;
       const scale = Math.min(W, H) * 0.42;
       const focal = 1.9;
-      const sin = Math.sin(angle), cos = Math.cos(angle);
+      const sinY = Math.sin(yaw), cosY = Math.cos(yaw);
+      const sinP = Math.sin(pitch), cosP = Math.cos(pitch);
 
       // 줌인 정도(0..1) — 색/밝기 강조용
       const zoomT = 1 - (cam - CAM_MIN) / (CAM_MAX - CAM_MIN);
 
       for (let i = 0; i < pts.length; i++) {
         const p = pts[i];
-        // Y축 회전 + 살짝 기울임
-        const xr = p.x * cos - p.z * sin;
-        const zr = p.x * sin + p.z * cos;
-        const yr = p.y;
+        // Y축 회전(yaw) → X축 회전(pitch)
+        const x1 = p.x * cosY - p.z * sinY;
+        const z1 = p.x * sinY + p.z * cosY;
+        const y1 = p.y;
+        const xr = x1;
+        const yr = y1 * cosP - z1 * sinP;
+        const zr = y1 * sinP + z1 * cosP;
 
         const z = zr + cam; // 카메라까지 거리
         if (z <= 0.06) continue; // 카메라 뒤 → 스킵
@@ -107,7 +123,7 @@ export function ParticleField({ camRef, count = 900 }: Props) {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
     };
-  }, [camRef, count]);
+  }, [camRef, rotRef, count]);
 
   return (
     <canvas
