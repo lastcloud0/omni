@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>O.M.N.I. — Shell Preview</title>
+<style>
+  html,body{height:100%;margin:0;background:#020617;background-image:
+    radial-gradient(ellipse at 50% 30%,rgba(56,189,248,.12),transparent 60%),
+    radial-gradient(ellipse at 50% 120%,rgba(14,165,233,.10),transparent 55%);
+    font-family:ui-monospace,Consolas,monospace;color:#7dd3fc;display:flex;
+    align-items:center;justify-content:center;min-height:100%;overflow-x:hidden;}
+  .wrap{display:flex;flex-direction:column;align-items:center;gap:16px;padding:24px;}
+  h1{letter-spacing:.5em;font-size:22px;margin:0;text-shadow:0 0 8px rgba(56,189,248,.7);}
+  .pbtns{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;}
+  .pbtn{border:1px solid rgba(56,189,248,.3);color:rgba(125,211,252,.75);background:rgba(56,189,248,.05);
+    border-radius:999px;padding:5px 12px;font-size:10px;letter-spacing:.15em;font-family:inherit;cursor:pointer;}
+  .pbtn:hover{background:rgba(34,211,238,.12);}
+  #closeall{border:1px solid rgba(251,191,36,.3);color:rgba(251,191,36,.7);background:none;
+    border-radius:999px;padding:5px 12px;font-size:10px;letter-spacing:.15em;font-family:inherit;cursor:pointer;}
+  #stage{position:relative;width:min(480px,92vw);min-height:320px;display:flex;align-items:center;justify-content:center;}
+  #panels{position:absolute;inset:0;display:flex;flex-wrap:wrap;align-content:flex-start;
+    justify-content:space-between;gap:8px;pointer-events:none;z-index:5;}
+  #hud{position:relative;width:280px;height:280px;max-width:80vw;cursor:pointer;flex:none;}
+  #hud svg,#wave{position:absolute;inset:0;width:100%;height:100%;}
+  #hud svg{filter:drop-shadow(0 0 4px rgba(56,189,248,.6));}
+  #core{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    width:150px;height:150px;border-radius:50%;border:1px solid rgba(34,211,238,.4);
+    background:radial-gradient(circle,rgba(56,189,248,.35),rgba(2,6,23,.0) 70%);
+    display:flex;align-items:center;justify-content:center;font-weight:600;
+    letter-spacing:.2em;font-size:18px;text-shadow:0 0 8px rgba(56,189,248,.8);
+    box-shadow:0 0 24px rgba(56,189,248,.5);
+    transition:width .5s cubic-bezier(.2,.8,.2,1),height .5s cubic-bezier(.2,.8,.2,1);}
+  .hpanel{position:relative;width:140px;background:rgba(2,6,23,.7);border:1px solid rgba(34,211,238,.3);
+    border-radius:6px;padding:10px;pointer-events:auto;box-shadow:0 0 18px rgba(56,189,248,.18);backdrop-filter:blur(6px);}
+  .hpanel .ttl{font-size:10px;letter-spacing:.2em;text-shadow:0 0 6px rgba(56,189,248,.6);margin-bottom:6px;display:flex;justify-content:space-between;}
+  .hpanel .row{display:flex;justify-content:space-between;font-size:10px;margin:2px 0;}
+  .hpanel .row span:first-child{color:rgba(56,189,248,.5);}
+  .hpanel .pri{font-size:8px;letter-spacing:.2em;color:rgba(56,189,248,.3);margin-top:6px;}
+  .xb{cursor:pointer;color:rgba(56,189,248,.5);}
+  #status{display:flex;align-items:center;gap:8px;border:1px solid rgba(56,189,248,.3);
+    background:rgba(56,189,248,.06);padding:7px 18px;border-radius:999px;font-size:12px;letter-spacing:.3em;}
+  #dot{width:8px;height:8px;border-radius:50%;background:#38bdf8;}
+  #cta{font-size:13px;letter-spacing:.2em;color:#22d3ee;text-shadow:0 0 8px rgba(56,189,248,.6);}
+  .sub{font-size:11px;letter-spacing:.12em;color:rgba(125,211,252,.5);text-align:center;}
+  .fallback{display:flex;flex-direction:column;gap:4px;width:min(440px,90vw);margin-top:4px;}
+  .fallback>span{font-size:10px;letter-spacing:.25em;color:rgba(56,189,248,.4);padding-left:4px;}
+  .frow{display:flex;gap:8px;opacity:.8;}
+  .frow input{flex:1;background:rgba(56,189,248,.05);border:1px solid rgba(56,189,248,.2);border-radius:8px;
+    padding:8px 14px;color:#7dd3fc;font-family:inherit;font-size:13px;outline:none;}
+  .frow button{background:rgba(56,189,248,.05);border:1px solid rgba(56,189,248,.3);border-radius:8px;
+    padding:8px 14px;color:rgba(125,211,252,.7);font-family:inherit;font-size:11px;letter-spacing:.15em;cursor:pointer;}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>O.M.N.I.</h1>
+
+    <div class="pbtns">
+      <button class="pbtn" data-id="system">+ SYSTEM STATUS</button>
+      <button class="pbtn" data-id="weather">+ WEATHER</button>
+      <button class="pbtn" data-id="clock">+ TIME</button>
+      <button id="closeall">CLOSE ALL</button>
+    </div>
+
+    <div id="stage">
+      <div id="panels"></div>
+      <div id="hud">
+        <svg viewBox="0 0 300 300">
+          <circle id="r1" cx="150" cy="150" r="138" fill="none" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="2 12" opacity=".55"/>
+          <circle id="r2" cx="150" cy="150" r="112" fill="none" stroke="#22d3ee" stroke-width="2" stroke-dasharray="34 16" opacity=".45"/>
+          <circle id="r3" cx="150" cy="150" r="88" fill="none" stroke="#38bdf8" stroke-width="1" opacity=".35"/>
+        </svg>
+        <canvas id="wave" width="300" height="300"></canvas>
+        <div id="core">OFF</div>
+      </div>
+    </div>
+
+    <div id="status"><span id="dot"></span><span id="slabel">STANDBY</span></div>
+    <div id="cta">코어를 눌러 음성 활성화</div>
+    <div class="sub">VOICE MODE · 메인 입력</div>
+
+    <div class="fallback">
+      <span>보조 입력 (TEXT FALLBACK)</span>
+      <div class="frow">
+        <input placeholder="음성이 어려울 때 여기로 명령…"/>
+        <button>SEND</button>
+      </div>
+    </div>
+    <div class="sub">패널 버튼으로 API 화면 띄우기 · 패널 뜨면 코어 축소 · 데모 껍데기</div>
+  </div>
+<script>
+(function(){
+  var S=[["STANDBY","#38bdf8",0],["LISTENING","#22d3ee",1],["THINKING","#a78bfa",1],["RESPONDING","#34d399",1]];
+  var DATA={
+    system:{title:"SYSTEM STATUS",priority:90,lines:[["CPU","32%"],["MEMORY","6.1/16 GB"],["NETWORK","ONLINE"]]},
+    weather:{title:"WEATHER",priority:60,lines:[["SEOUL","24°C"],["STATUS","CLEAR"],["HUMIDITY","48%"]]},
+    clock:{title:"TIME",priority:40,lines:[["LOCAL","--"],["ZONE","KST +09:00"]]}
+  };
+  var si=0,t=0,openIds=[];
+  var core=document.getElementById('core'),slabel=document.getElementById('slabel'),dot=document.getElementById('dot'),cta=document.getElementById('cta');
+  var r1=document.getElementById('r1'),r2=document.getElementById('r2'),r3=document.getElementById('r3');
+  var ctx=document.getElementById('wave').getContext('2d'),panelsEl=document.getElementById('panels');
+
+  function renderPanels(){
+    var sorted=openIds.slice().sort(function(a,b){return DATA[b].priority-DATA[a].priority;});
+    panelsEl.innerHTML=sorted.map(function(id){
+      var dd=DATA[id];
+      var rows=dd.lines.map(function(p){
+        var v=(id==='clock'&&p[0]==='LOCAL')?new Date().toLocaleTimeString('ko-KR'):p[1];
+        return '<div class="row"><span>'+p[0]+'</span><span style="color:#7dd3fc">'+v+'</span></div>';
+      }).join('');
+      return '<div class="hpanel"><div class="ttl">'+dd.title+'<span class="xb" data-x="'+id+'">✕</span></div>'+rows+'<div class="pri">PRIORITY '+dd.priority+'</div></div>';
+    }).join('');
+    var big=openIds.length===0;
+    core.style.width=core.style.height=(big?150:104)+'px';
+    panelsEl.querySelectorAll('[data-x]').forEach(function(b){b.onclick=function(e){e.stopPropagation();openIds=openIds.filter(function(i){return i!==b.dataset.x;});renderPanels();};});
+  }
+  document.querySelectorAll('.pbtn').forEach(function(b){b.onclick=function(){if(openIds.indexOf(b.dataset.id)<0)openIds.push(b.dataset.id);renderPanels();};});
+  document.getElementById('closeall').onclick=function(){openIds=[];renderPanels();};
+  document.getElementById('hud').onclick=function(e){
+    if(e.target.closest('.hpanel'))return;
+    si=(si+1)%S.length;var s=S[si];
+    slabel.textContent=s[0];dot.style.background=s[1];r1.style.stroke=s[1];r2.style.stroke=s[1];r3.style.stroke=s[1];
+    core.textContent=s[2]?"ON":"OFF";cta.textContent=s[2]?"“옴니”라고 부르세요":"코어를 눌러 음성 활성화";
+  };
+  setInterval(function(){if(openIds.indexOf('clock')>=0)renderPanels();},1000);
+
+  (function loop(){t++;var s=S[si],on=s[2],f=si>=2?2.4:1;
+    r1.setAttribute('transform','rotate('+(t*0.4*f)+' 150 150)');
+    r2.setAttribute('transform','rotate('+(-t*0.3*f)+' 150 150)');
+    var p=1+Math.sin(t*0.05)*0.03;r3.setAttribute('transform','translate('+(150-150*p)+','+(150-150*p)+') scale('+p+')');
+    core.style.boxShadow='0 0 '+(on?24+Math.abs(Math.sin(t*0.06))*30:14)+'px rgba(56,189,248,'+(on?.8:.3)+')';
+    ctx.clearRect(0,0,300,300);
+    for(var i=0,n=72;i<n;i++){var a=i/n*Math.PI*2,amp=on?0.15+Math.abs(Math.sin(t*0.08+i*0.5))*0.55:0.1+Math.sin(t*0.04+i*0.4)*0.05,rad=70,len=6+amp*48;
+      ctx.strokeStyle='rgba(56,'+(189+amp*40)+',248,'+(0.35+amp*0.6)+')';ctx.lineWidth=2;ctx.lineCap='round';ctx.beginPath();
+      ctx.moveTo(150+Math.cos(a)*rad,150+Math.sin(a)*rad);ctx.lineTo(150+Math.cos(a)*(rad+len),150+Math.sin(a)*(rad+len));ctx.stroke();}
+    requestAnimationFrame(loop);})();
+  renderPanels();
+})();
+</script>
+</body>
+</html>
