@@ -44,6 +44,12 @@ export default function Home() {
           <span className="text-[11px] tracking-[0.2em] text-sky-400/40">
             {awake ? STATUS_LABEL[status] : "TAP TO WAKE"}
           </span>
+          <a
+            href="/vision"
+            className="mt-1 rounded-full border border-sky-400/25 px-3 py-1 text-[10px] tracking-[0.25em] text-sky-300/60 transition hover:border-sky-400/60 hover:text-sky-200"
+          >
+            VISION ↗ 손 인식 모드
+          </a>
         </div>
 
         {/* 실시간 음성 인식 자막 */}
