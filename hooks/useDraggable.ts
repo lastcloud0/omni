@@ -59,17 +59,19 @@ export function useDraggable({
         const { x, y } = clampPos(nx, ny, boxRef.current.w, boxRef.current.h);
         setBox((b) => ({ ...b, x, y }));
       } else if (mode.current === "resize") {
-        let nw = Math.max(minW, Math.min(maxW, s.bw + (e.clientX - s.mx)));
-        let nh = Math.max(minH, Math.min(maxH, s.bh + (e.clientY - s.my)));
+        // 좌상단 핸들: 마우스를 왼쪽위로 끌수록 커지고, 우하단 모서리는 고정.
+        const anchorR = s.bx + s.bw; // 오른쪽 변 고정
+        const anchorB = s.by + s.bh; // 아래쪽 변 고정
+        let nw = Math.max(minW, Math.min(maxW, s.bw - (e.clientX - s.mx)));
+        let nh = Math.max(minH, Math.min(maxH, s.bh - (e.clientY - s.my)));
         if (aspect) {
-          // 가로 기준으로 비율 맞춤
           nh = nw / aspect;
           if (nh < minH) {
             nh = minH;
             nw = nh * aspect;
           }
         }
-        setBox((b) => ({ ...b, w: nw, h: nh }));
+        setBox((b) => ({ ...b, x: anchorR - nw, y: anchorB - nh, w: nw, h: nh }));
       }
     },
     [aspect, maxH, maxW, minH, minW]

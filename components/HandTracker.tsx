@@ -118,7 +118,8 @@ export function HandTracker({ active, onFrame, showPreview = true }: Props) {
       className="glass fixed z-50 select-none overflow-hidden rounded-xl"
       style={{
         left: box.x,
-        top: box.y,
+        // 최소화 시 아래 변을 고정 → 박스가 우하단에 머무름.
+        top: collapsed ? box.y + box.h : box.y,
         width: box.w,
         height: collapsed ? HEADER_H : HEADER_H + box.h,
         touchAction: "none",
@@ -179,14 +180,12 @@ export function HandTracker({ active, onFrame, showPreview = true }: Props) {
           </div>
         )}
 
-        {/* 우하단 리사이즈 핸들 */}
+        {/* 좌상단 리사이즈 핸들 (시각 표시 없음, 모서리 드래그) */}
         <div
           {...resizeProps}
-          className="absolute bottom-0 right-0 h-4 w-4 cursor-nwse-resize"
+          className="absolute left-0 top-0 h-5 w-5 cursor-nwse-resize"
           style={{ touchAction: "none" }}
-        >
-          <div className="absolute bottom-1 right-1 h-2 w-2 border-b-2 border-r-2 border-sky-300/70" />
-        </div>
+        />
       </div>
     </div>
   );
