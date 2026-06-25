@@ -84,7 +84,15 @@ export default function Home() {
           </p>
         )}
         <form onSubmit={submit} className="flex w-full items-center gap-2">
-          {/* 음성 토글 (작은 마이크) */}
+          {/* 입력창 — 넓게 차지 */}
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="무엇이든 물어보세요…"
+            className="h-12 min-w-0 flex-1 rounded-2xl border border-sky-400/30 bg-white/[0.06] px-4 text-[15px] text-sky-50 placeholder:text-slate-400/80 outline-none transition focus:border-sky-400/80 focus:bg-white/[0.09] focus:ring-2 focus:ring-sky-500/20"
+          />
+
+          {/* 동작 버튼 그룹: 마이크 + SEND 를 오른쪽에 묶음 */}
           <button
             type="button"
             onClick={toggleAwake}
@@ -110,14 +118,6 @@ export default function Home() {
               <line x1="12" y1="19" x2="12" y2="23" />
             </svg>
           </button>
-
-          {/* 입력창 — 밝은 보더 + 또렷한 텍스트 */}
-          <input
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder="무엇이든 물어보세요…"
-            className="h-12 min-w-0 flex-1 rounded-2xl border border-sky-400/30 bg-white/[0.06] px-4 text-[15px] text-sky-50 placeholder:text-slate-400/80 outline-none transition focus:border-sky-400/80 focus:bg-white/[0.09] focus:ring-2 focus:ring-sky-500/20"
-          />
 
           <button
             type="submit"
