@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { HandTracker } from "@/components/HandTracker";
 import { ParticleField } from "@/components/ParticleField";
+import { useDraggable } from "@/hooks/useDraggable";
 import type { HandFrame } from "@/hooks/useHandTracking";
 
 // 핀치 변화량 → 카메라 거리 변화에 곱하는 이득. 클수록 줌이 민감.
@@ -32,6 +33,13 @@ export default function VisionPage() {
 
   const pinching = frame ? frame.pinch < 0.06 : false;
 
+  // 하단 중앙 시작, 드래그로 이동 가능한 컨트롤 박스.
+  const ctrlInit =
+    typeof window !== "undefined"
+      ? { x: window.innerWidth / 2 - 215, y: window.innerHeight - 80, w: 430, h: 56 }
+      : { x: 40, y: 40, w: 430, h: 56 };
+  const { box: ctrl, dragProps: ctrlDrag } = useDraggable({ initial: ctrlInit });
+
   return (
     <main className="relative h-screen w-screen overflow-hidden">
       {/* 전체 화면 파티클 (프레임 없음) */}
@@ -52,9 +60,24 @@ export default function VisionPage() {
         />
       )}
 
-      {/* 하단 중앙 글래스 컨트롤 박스 */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-6 flex justify-center px-4">
-        <div className="glass pointer-events-auto flex items-center gap-4 rounded-2xl px-5 py-3 text-xs">
+      {/* 드래그 가능한 글래스 컨트롤 박스 */}
+      <div
+        className="glass fixed z-40 flex select-none items-center gap-3 rounded-2xl py-3 pl-2 pr-4 text-xs"
+        style={{ left: ctrl.x, top: ctrl.y, touchAction: "none" }}
+      >
+        {/* 그립 핸들 (이걸 잡고 이동) */}
+        <div
+          {...ctrlDrag}
+          className="flex h-7 w-5 items-center justify-center text-slate-500 hover:text-sky-300"
+          aria-label="이동"
+        >
+          <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor">
+            <circle cx="2.5" cy="3" r="1.2" /><circle cx="7.5" cy="3" r="1.2" />
+            <circle cx="2.5" cy="8" r="1.2" /><circle cx="7.5" cy="8" r="1.2" />
+            <circle cx="2.5" cy="13" r="1.2" /><circle cx="7.5" cy="13" r="1.2" />
+          </svg>
+        </div>
+        <div className="flex items-center gap-4">
           {/* 감지 */}
           <div className="flex flex-col items-center gap-0.5">
             <span className="text-[10px] tracking-wider text-slate-400">감지</span>
