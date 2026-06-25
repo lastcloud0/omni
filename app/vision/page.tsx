@@ -20,9 +20,7 @@ export default function VisionPage() {
     setFrame(f);
     if (f.detected) {
       if (lastPinch.current != null) {
-        // 핀치가 줄면(오므림) → 카메라 거리 감소(줌인).
-        // 변화량 자체가 클수록(=빠른 핀치) 줌도 빠르게 → 속도 연동.
-        const delta = f.pinch - lastPinch.current; // 음수면 오므리는 중
+        const delta = f.pinch - lastPinch.current; // 음수면 오므리는 중 → 줌인
         camRef.current += delta * ZOOM_GAIN;
         camRef.current = Math.max(0.5, Math.min(3.4, camRef.current));
       }
@@ -35,75 +33,98 @@ export default function VisionPage() {
   const pinching = frame ? frame.pinch < 0.06 : false;
 
   return (
-    <main className="relative flex min-h-screen flex-col items-center justify-start gap-5 px-6 py-8">
-      <div className="z-10 text-center">
-        <h1 className="text-xl font-light tracking-[0.35em] text-sky-300">
-          OMNI · VISION
-        </h1>
-        <p className="mt-2 text-sm text-slate-400">
-          손을 비추고 <b className="text-sky-300">오므리면 줌인</b> · 펴면 줌아웃
-          (속도는 핀치 속도에 비례)
-        </p>
-      </div>
-
-      {/* 파티클 구체 무대 */}
-      <div className="relative h-[58vh] w-full max-w-3xl overflow-hidden rounded-3xl border border-white/10 bg-black/40">
+    <main className="relative h-screen w-screen overflow-hidden">
+      {/* 전체 화면 파티클 (프레임 없음) */}
+      <div className="absolute inset-0">
         <ParticleField camRef={camRef} count={900} />
-
-        {/* 손 포인터 */}
-        {frame?.detected && frame.pointer && (
-          <div
-            className="pointer-events-none absolute h-14 w-14 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 transition-colors"
-            style={{
-              left: `${(1 - frame.pointer.x) * 100}%`,
-              top: `${frame.pointer.y * 100}%`,
-              borderColor: pinching ? "#34d399" : "rgba(56,189,248,0.7)",
-              boxShadow: `0 0 20px ${pinching ? "#34d399" : "rgba(56,189,248,0.5)"}`,
-            }}
-          />
-        )}
-
-        {!active && (
-          <div className="absolute inset-0 flex items-center justify-center text-sm text-slate-500">
-            아래 버튼으로 카메라를 켜세요
-          </div>
-        )}
       </div>
 
-      {/* 실시간 수치 */}
-      <div className="z-10 flex gap-6 text-center text-xs text-slate-400">
-        <div>
-          <div className="text-slate-500">감지</div>
-          <div className={frame?.detected ? "text-emerald-400" : "text-slate-500"}>
-            {frame?.detected ? "YES" : "NO"}
+      {/* 손 포인터 (전체 화면 기준) */}
+      {frame?.detected && frame.pointer && (
+        <div
+          className="pointer-events-none absolute h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 transition-colors"
+          style={{
+            left: `${(1 - frame.pointer.x) * 100}%`,
+            top: `${frame.pointer.y * 100}%`,
+            borderColor: pinching ? "#34d399" : "rgba(56,189,248,0.7)",
+            boxShadow: `0 0 24px ${pinching ? "#34d399" : "rgba(56,189,248,0.5)"}`,
+          }}
+        />
+      )}
+
+      {/* 하단 중앙 글래스 컨트롤 박스 */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-6 flex justify-center px-4">
+        <div className="glass pointer-events-auto flex items-center gap-4 rounded-2xl px-5 py-3 text-xs">
+          {/* 감지 */}
+          <div className="flex flex-col items-center gap-0.5">
+            <span className="text-[10px] tracking-wider text-slate-400">감지</span>
+            <span
+              className={`flex items-center gap-1 ${
+                frame?.detected ? "text-emerald-300" : "text-slate-500"
+              }`}
+            >
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${
+                  frame?.detected ? "bg-emerald-400" : "bg-slate-600"
+                }`}
+              />
+              {frame?.detected ? "YES" : "NO"}
+            </span>
           </div>
-        </div>
-        <div>
-          <div className="text-slate-500">핀치값</div>
-          <div className="text-sky-300">{frame ? frame.pinch.toFixed(3) : "—"}</div>
-        </div>
-        <div>
-          <div className="text-slate-500">상태</div>
-          <div className={pinching ? "text-emerald-400" : "text-sky-300"}>
-            {pinching ? "PINCH" : frame?.detected ? "OPEN" : "—"}
+
+          <span className="h-7 w-px bg-white/10" />
+
+          {/* 핀치값 */}
+          <div className="flex flex-col items-center gap-0.5">
+            <span className="text-[10px] tracking-wider text-slate-400">핀치</span>
+            <span className="font-mono text-sky-200">
+              {frame ? frame.pinch.toFixed(3) : "—"}
+            </span>
           </div>
+
+          <span className="h-7 w-px bg-white/10" />
+
+          {/* 상태 */}
+          <div className="flex flex-col items-center gap-0.5">
+            <span className="text-[10px] tracking-wider text-slate-400">상태</span>
+            <span className={pinching ? "text-emerald-300" : "text-sky-200"}>
+              {pinching ? "PINCH" : frame?.detected ? "OPEN" : "—"}
+            </span>
+          </div>
+
+          <span className="h-7 w-px bg-white/10" />
+
+          {/* 카메라 토글 */}
+          <button
+            onClick={() => setActive((v) => !v)}
+            className="flex items-center gap-2"
+            aria-label="카메라 토글"
+          >
+            <span className="text-[10px] tracking-wider text-slate-400">CAM</span>
+            <span
+              className={`relative h-5 w-9 rounded-full transition-colors ${
+                active ? "bg-sky-500/70" : "bg-slate-600/60"
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${
+                  active ? "left-[18px]" : "left-0.5"
+                }`}
+              />
+            </span>
+          </button>
+
+          <span className="h-7 w-px bg-white/10" />
+
+          {/* OMNI 메인 */}
+          <a
+            href="/"
+            className="rounded-lg px-2 py-1 tracking-widest text-slate-300 transition hover:text-sky-300"
+          >
+            OMNI
+          </a>
         </div>
       </div>
-
-      <button
-        onClick={() => setActive((v) => !v)}
-        className={`z-10 rounded-2xl px-6 py-3 text-sm font-medium transition ${
-          active
-            ? "border border-red-400/40 bg-red-500/15 text-red-200"
-            : "bg-gradient-to-br from-sky-400 to-indigo-600 text-white hover:brightness-110"
-        }`}
-      >
-        {active ? "카메라 끄기" : "카메라 켜기"}
-      </button>
-
-      <a href="/" className="z-10 text-xs tracking-widest text-slate-500 hover:text-sky-300">
-        ← OMNI 메인으로
-      </a>
 
       <HandTracker active={active} onFrame={onFrame} showPreview={active} />
     </main>
