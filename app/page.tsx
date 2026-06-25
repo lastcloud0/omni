@@ -32,7 +32,7 @@ export default function Home() {
   const recent = messages.slice(-6);
 
   return (
-    <main className="relative mx-auto flex min-h-screen w-full max-w-2xl flex-col items-center justify-between px-5 py-10">
+    <main className="relative mx-auto flex min-h-screen w-full max-w-2xl flex-col items-center justify-between px-4 py-8 sm:px-5 sm:py-10">
       {/* 상단: 구체 + 라벨 + 상태 */}
       <section className="flex flex-1 flex-col items-center justify-center gap-5">
         <OmniOrb status={status} level={level} onClick={toggleAwake} />
@@ -83,7 +83,7 @@ export default function Home() {
             이 브라우저는 음성 인식을 지원하지 않습니다. 입력창으로 명령하세요.
           </p>
         )}
-        <form onSubmit={submit} className="flex items-center gap-2.5">
+        <form onSubmit={submit} className="flex w-full items-center gap-2">
           {/* 음성 토글 (작은 마이크) */}
           <button
             type="button"
@@ -116,12 +116,12 @@ export default function Home() {
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder="무엇이든 물어보세요…"
-            className="h-12 flex-1 rounded-2xl border border-sky-400/30 bg-white/[0.06] px-5 text-[15px] text-sky-50 placeholder:text-slate-400/80 outline-none transition focus:border-sky-400/80 focus:bg-white/[0.09] focus:ring-2 focus:ring-sky-500/20"
+            className="h-12 min-w-0 flex-1 rounded-2xl border border-sky-400/30 bg-white/[0.06] px-4 text-[15px] text-sky-50 placeholder:text-slate-400/80 outline-none transition focus:border-sky-400/80 focus:bg-white/[0.09] focus:ring-2 focus:ring-sky-500/20"
           />
 
           <button
             type="submit"
-            className="h-12 shrink-0 rounded-2xl bg-gradient-to-br from-sky-400 to-indigo-600 px-6 text-[14px] font-medium text-white transition hover:brightness-110 active:scale-95"
+            className="h-12 shrink-0 rounded-2xl bg-gradient-to-br from-sky-400 to-indigo-600 px-4 text-[13px] font-medium text-white transition hover:brightness-110 active:scale-95 sm:px-6 sm:text-[14px]"
           >
             SEND
           </button>
