@@ -20,6 +20,7 @@ const config: Config = {
       },
       fontFamily: {
         mono: ["var(--font-mono)", "ui-monospace", "monospace"],
+        sans: ["var(--font-sans)", "system-ui", "sans-serif"],
       },
       boxShadow: {
         neon: "0 0 8px rgba(56,189,248,0.6), 0 0 24px rgba(56,189,248,0.35)",

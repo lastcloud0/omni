@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChatMessage, OmniStatus, Panel } from "@/lib/types";
 import { speak } from "@/lib/speak";
 import { askAI } from "@/lib/aiClient";
+import { validateReply } from "@/lib/validation";
 import { useSpeechRecognition } from "./useSpeechRecognition";
 
 const WAKE_WORDS = ["옴니", "오므니", "옴리", "omni"];
@@ -42,6 +43,9 @@ export function useOmni({ onPanel }: OmniOptions = {}) {
   const [awake, setAwake] = useState(false); // wake-word toggle (mic armed)
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const busyRef = useRef(false);
+  // respondTo에서 최신 대화 기록을 stale 없이 읽기 위한 거울.
+  const messagesRef = useRef<ChatMessage[]>([]);
+  messagesRef.current = messages;
 
   // Load persisted log.
   useEffect(() => {
@@ -70,16 +74,27 @@ export function useOmni({ onPanel }: OmniOptions = {}) {
     async (userText: string) => {
       if (busyRef.current) return;
       busyRef.current = true;
+      // 직전 대화 기록을 캡처(새 user 메시지 추가 전) → 맥락 유지.
+      const history = messagesRef.current.map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
       pushMessage({ id: uid(), role: "user", content: userText, createdAt: Date.now() });
       setStatus("thinking");
 
       // 두뇌는 어댑터(askAI)에 위임 — 껍데기는 결과만 받아 출력한다.
-      const { reply, panel } = await askAI(userText);
+      const { reply, panel } = await askAI(userText, history);
       if (panel) onPanelRef.current?.(panel);
 
-      pushMessage({ id: uid(), role: "assistant", content: reply, createdAt: Date.now() });
+      // 클라이언트 검증규칙 통과 — 금지답안 차단/교정.
+      const checked = validateReply(reply);
+      if (checked.issues.length) {
+        console.warn("검증규칙 위반:", checked.issues);
+      }
+
+      pushMessage({ id: uid(), role: "assistant", content: checked.reply, createdAt: Date.now() });
       setStatus("responding");
-      await speak(reply);
+      await speak(checked.reply);
       busyRef.current = false;
       setStatus(awake ? "listening" : "idle");
     },

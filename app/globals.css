@@ -1,8 +1,12 @@
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+    system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
 }
 
@@ -12,10 +16,8 @@ body {
 }
 
 body {
-  @apply bg-omni-bg text-omni-glow antialiased;
-  background-image:
-    radial-gradient(ellipse at 50% 30%, rgba(56, 189, 248, 0.12), transparent 60%),
-    radial-gradient(ellipse at 50% 120%, rgba(14, 165, 233, 0.1), transparent 55%);
+  @apply text-omni-glow antialiased;
+  background: #000005;
   overflow-x: hidden;
 }
 

@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
+import { buildKnowledgeBase } from "@/lib/knowledgeBase";
 
 export const runtime = "nodejs";
 
-const SYSTEM_PROMPT = `당신은 'OMNI(옴니)'라는 이름의 독자적인 AI 데스크톱 비서다.
+const PERSONA = `당신은 'OMNI(옴니)'라는 이름의 독자적인 AI 데스크톱 비서다.
 
 [정체성]
 - 이름은 "OMNI". 다른 AI나 특정 영화·작품의 캐릭터(예: 자비스, 토니 스타크,
@@ -20,14 +21,47 @@ const SYSTEM_PROMPT = `당신은 'OMNI(옴니)'라는 이름의 독자적인 AI 
   답한다. 글자 수에 얽매여 성의 없이 짧게 끊지 않는다.
 - 사실에 근거해 정확하게 답하고, 모르면 솔직히 모른다고 한다.`;
 
-// 무료로 쓸 수 있는 Google Gemini Flash 모델.
-const MODEL = "gemini-2.5-flash";
+// 페르소나 + 지식베이스(사전·금지·예시)를 합쳐 최종 시스템 프롬프트를 만든다.
+const SYSTEM_PROMPT = `${PERSONA}\n\n${buildKnowledgeBase()}`;
+
+// 무료 Gemini 모델 — 앞에서부터 시도하고, 과부하(503)/한도(429) 시 다음으로 넘어간다.
+const MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash"];
+
+interface Turn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** 한 모델로 1회 호출. 일시적 오류(429/503/5xx)면 retryable=true 로 알림. */
+async function callGemini(model: string, apiKey: string, body: string) {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+    { method: "POST", headers: { "Content-Type": "application/json" }, body }
+  );
+  if (res.ok) {
+    const data = await res.json();
+    const reply =
+      data.candidates?.[0]?.content?.parts
+        ?.map((p: { text?: string }) => p.text || "")
+        .join("")
+        .trim() || "";
+    return { ok: true as const, reply };
+  }
+  const errText = await res.text();
+  const retryable = res.status === 429 || res.status === 503 || res.status >= 500;
+  return { ok: false as const, status: res.status, retryable, errText };
+}
 
 export async function POST(req: Request) {
-  const { message } = await req.json().catch(() => ({ message: "" }));
+  const { message, history } = await req
+    .json()
+    .catch(() => ({ message: "", history: [] }));
   if (!message || typeof message !== "string") {
     return NextResponse.json({ reply: "명령을 인식하지 못했습니다." });
   }
+  const turns: Turn[] = Array.isArray(history) ? history : [];
 
   const apiKey = process.env.GEMINI_API_KEY;
 
@@ -38,33 +72,38 @@ export async function POST(req: Request) {
     });
   }
 
+  const body = JSON.stringify({
+    system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+    // 직전 대화(최근 12턴)를 함께 보내 맥락을 유지한다.
+    // Gemini는 assistant 역할을 "model"로 표기한다.
+    contents: [
+      ...turns.slice(-12).map((t) => ({
+        role: t.role === "assistant" ? "model" : "user",
+        parts: [{ text: t.content }],
+      })),
+      { role: "user", parts: [{ text: message }] },
+    ],
+    generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
+  });
+
+  // 모델 목록을 순서대로 시도. 같은 모델은 짧게 1회 더 재시도(과부하 대비).
+  let lastErr = "";
   try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-          contents: [{ role: "user", parts: [{ text: message }] }],
-          generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
-        }),
+    for (const model of MODELS) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const r = await callGemini(model, apiKey, body);
+        if (r.ok) {
+          return NextResponse.json({ reply: r.reply || "…" });
+        }
+        lastErr = `${model} ${r.status}: ${r.errText.slice(0, 120)}`;
+        console.error("Gemini error:", lastErr);
+        if (!r.retryable) break; // 재시도 불가 오류면 다음 모델로
+        await sleep(700); // 잠깐 쉬고 재시도
       }
-    );
-
-    if (!res.ok) {
-      const err = await res.text();
-      console.error("Gemini error:", err);
-      return NextResponse.json({ reply: "두뇌 모듈에 일시적인 오류가 발생했습니다." });
     }
-
-    const data = await res.json();
-    const reply =
-      data.candidates?.[0]?.content?.parts
-        ?.map((p: { text?: string }) => p.text || "")
-        .join("")
-        .trim() || "…";
-    return NextResponse.json({ reply });
+    return NextResponse.json({
+      reply: "지금 AI 서버가 잠시 붐비네요, 선생님. 잠시 후 다시 말씀해 주시겠습니까?",
+    });
   } catch (e) {
     console.error(e);
     return NextResponse.json({ reply: "서버 연결에 실패했습니다." });

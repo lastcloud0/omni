@@ -1,15 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useOmni } from "@/hooks/useOmni";
-import { usePanels, DEMO_PANELS } from "@/hooks/usePanels";
-import { OmniHUD } from "@/components/OmniHUD";
-import { HudPanel } from "@/components/HudPanel";
-import { ChatLog } from "@/components/ChatLog";
+import { useAudioLevel } from "@/hooks/useAudioLevel";
+import { OmniOrb } from "@/components/OmniOrb";
+import { STATUS_LABEL } from "@/lib/types";
 
 export default function Home() {
-  const { panels, open, close, clear, hasPanels } = usePanels();
   const {
     status,
     awake,
@@ -19,23 +17,10 @@ export default function Home() {
     toggleAwake,
     sendText,
     clearLog,
-  } = useOmni({ onPanel: open }); // AI가 패널을 주면 껍데기가 출력
+  } = useOmni();
+  const micActive = awake && (status === "listening" || status === "responding");
+  const { level } = useAudioLevel(micActive);
   const [draft, setDraft] = useState("");
-
-  // 시계 패널이 떠 있으면 매초 LOCAL 시간 갱신.
-  useEffect(() => {
-    if (!panels.some((p) => p.id === "clock")) return;
-    const id = setInterval(() => {
-      open({
-        ...DEMO_PANELS.find((p) => p.id === "clock")!,
-        lines: [
-          { label: "LOCAL", value: new Date().toLocaleTimeString("ko-KR") },
-          { label: "ZONE", value: "KST +09:00" },
-        ],
-      });
-    }, 1000);
-    return () => clearInterval(id);
-  }, [panels, open]);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,115 +29,114 @@ export default function Home() {
     setDraft("");
   };
 
+  const recent = messages.slice(-6);
+
   return (
-    <main className="mx-auto grid min-h-screen w-full max-w-6xl grid-cols-1 gap-8 px-4 py-8 lg:grid-cols-[1.4fr_1fr] lg:items-center">
-      {/* Left: HUD core */}
-      <section className="flex flex-col items-center justify-center gap-6">
-        <motion.h1
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center text-2xl font-bold tracking-[0.5em] text-glow"
-        >
-          O.M.N.I.
-        </motion.h1>
+    <main className="relative mx-auto flex min-h-screen w-full max-w-2xl flex-col items-center justify-between px-5 py-10">
+      {/* 상단: 구체 + 라벨 + 상태 */}
+      <section className="flex flex-1 flex-col items-center justify-center gap-5">
+        <OmniOrb status={status} level={level} onClick={toggleAwake} />
 
-        {/* HUD core + 우선순위 패널 레이어 */}
-        <div className="relative flex w-full items-center justify-center">
-          {/* 패널: priority 순으로 코어 좌우에 배치 */}
-          <AnimatePresence>
-            {hasPanels && (
-              <motion.div
-                key="panel-layer"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="pointer-events-none absolute inset-0 z-10 flex flex-wrap items-start justify-between gap-2"
-              >
-                {panels.map((p, i) => (
-                  <div key={p.id} className="pointer-events-auto">
-                    <HudPanel panel={p} index={i} onClose={close} />
-                  </div>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <OmniHUD
-            status={status}
-            awake={awake}
-            onToggle={toggleAwake}
-            compact={hasPanels}
-          />
+        <div className="flex flex-col items-center gap-1.5">
+          <span className="text-[13px] font-light tracking-[0.45em] text-sky-300/90">
+            O M N I
+          </span>
+          <span className="text-[11px] tracking-[0.2em] text-sky-400/40">
+            {awake ? STATUS_LABEL[status] : "TAP TO WAKE"}
+          </span>
         </div>
 
-        {/* 데모: 패널 띄우기/닫기 (실제 API 연동 전 자리표시자) */}
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          {DEMO_PANELS.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => open(p)}
-              className="rounded-full border border-omni-blue/30 bg-omni-blue/5 px-3 py-1 text-[10px] tracking-widest text-omni-blue/70 transition hover:bg-omni-cyan/10 hover:text-glow"
-            >
-              + {p.title}
-            </button>
-          ))}
-          {hasPanels && (
-            <button
-              onClick={clear}
-              className="rounded-full border border-amber-400/30 px-3 py-1 text-[10px] tracking-widest text-amber-400/70 transition hover:bg-amber-400/10"
-            >
-              CLOSE ALL
-            </button>
-          )}
+        {/* 실시간 음성 인식 자막 */}
+        <div className="h-5 text-center text-sm text-sky-300/70">
+          {interim && <span>“{interim}”</span>}
         </div>
-
-        {/* Voice = primary mode. Big call-to-action under the core. */}
-        <div className="flex flex-col items-center gap-1 text-center">
-          <p className="text-sm tracking-[0.2em] text-omni-cyan text-glow">
-            {awake ? "“옴니”라고 부르세요" : "코어를 눌러 음성 활성화"}
-          </p>
-          <p className="text-[11px] tracking-widest text-omni-blue/50">
-            VOICE MODE · 메인 입력
-          </p>
-        </div>
-
-        {/* Live transcript */}
-        <div className="h-6 text-center text-sm text-omni-cyan/70">
-          {interim && <span className="text-glow">“{interim}”</span>}
-        </div>
-
-        {!supported && (
-          <p className="max-w-sm text-center text-xs text-amber-400/80">
-            이 브라우저는 음성 인식을 지원하지 않습니다. Chrome을 사용하거나
-            아래 보조 입력창으로 명령하세요.
-          </p>
-        )}
       </section>
 
-      {/* Right: log + console input */}
-      <section className="flex h-[60vh] flex-col gap-4 lg:h-[70vh]">
-        <ChatLog messages={messages} onClear={clearLog} />
-
-        {/* Text = secondary / fallback input. Visually de-emphasized. */}
-        <div className="flex flex-col gap-1">
-          <span className="pl-1 text-[10px] tracking-[0.25em] text-omni-blue/40">
-            보조 입력 (TEXT FALLBACK)
-          </span>
-          <form onSubmit={submit} className="flex gap-2 opacity-80 focus-within:opacity-100">
-            <input
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder="음성이 어려울 때 여기로 명령…"
-              className="flex-1 rounded-lg border border-omni-blue/20 bg-omni-blue/5 px-4 py-2 text-sm text-omni-glow placeholder:text-omni-blue/30 outline-none focus:border-omni-cyan/50"
-            />
-            <button
-              type="submit"
-              className="rounded-lg border border-omni-blue/30 bg-omni-blue/5 px-4 py-2 text-xs tracking-widest text-omni-blue/70 transition hover:bg-omni-cyan/10 hover:text-glow"
+      {/* 대화 로그 (최근 몇 개만, 미니멀) */}
+      <section className="flex w-full flex-col gap-2.5 pb-4">
+        <AnimatePresence initial={false}>
+          {recent.map((m) => (
+            <motion.div
+              key={m.id}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
             >
-              SEND
+              <div
+                className={`max-w-[82%] rounded-2xl px-4 py-2.5 text-[14px] leading-relaxed ${
+                  m.role === "user"
+                    ? "bg-sky-500/15 text-sky-50"
+                    : "bg-white/[0.05] text-slate-100"
+                }`}
+              >
+                {m.content}
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </section>
+
+      {/* 하단: 입력창 (가시성 강화) + SEND + 음성 토글 */}
+      <section className="w-full">
+        {!supported && (
+          <p className="mb-2 text-center text-xs text-amber-400/70">
+            이 브라우저는 음성 인식을 지원하지 않습니다. 입력창으로 명령하세요.
+          </p>
+        )}
+        <form onSubmit={submit} className="flex items-center gap-2.5">
+          {/* 음성 토글 (작은 마이크) */}
+          <button
+            type="button"
+            onClick={toggleAwake}
+            aria-label={awake ? "음성 끄기" : "음성 켜기"}
+            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border transition ${
+              awake
+                ? "border-sky-400/60 bg-sky-500/20 text-sky-200"
+                : "border-white/10 bg-white/[0.04] text-slate-400 hover:text-sky-200"
+            }`}
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+              <line x1="12" y1="19" x2="12" y2="23" />
+            </svg>
+          </button>
+
+          {/* 입력창 — 밝은 보더 + 또렷한 텍스트 */}
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="무엇이든 물어보세요…"
+            className="h-12 flex-1 rounded-2xl border border-sky-400/30 bg-white/[0.06] px-5 text-[15px] text-sky-50 placeholder:text-slate-400/80 outline-none transition focus:border-sky-400/80 focus:bg-white/[0.09] focus:ring-2 focus:ring-sky-500/20"
+          />
+
+          <button
+            type="submit"
+            className="h-12 shrink-0 rounded-2xl bg-gradient-to-br from-sky-400 to-indigo-600 px-6 text-[14px] font-medium text-white transition hover:brightness-110 active:scale-95"
+          >
+            SEND
+          </button>
+        </form>
+
+        {messages.length > 0 && (
+          <div className="mt-2 text-center">
+            <button
+              onClick={clearLog}
+              className="text-[11px] tracking-widest text-slate-500 transition hover:text-sky-300"
+            >
+              CLEAR
             </button>
-          </form>
-        </div>
+          </div>
+        )}
       </section>
     </main>
   );

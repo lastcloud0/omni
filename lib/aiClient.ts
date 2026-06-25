@@ -16,6 +16,12 @@ export interface AIResponse {
   panel?: Panel;
 }
 
+/** 맥락 유지를 위해 함께 보내는 직전 대화 기록. */
+export interface AITurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
 /**
  * 기본값은 내장 /api/chat 라우트를 호출.
  * 외부의 기존 AI 서버를 쓰려면 NEXT_PUBLIC_AI_ENDPOINT 에 그 주소를 넣으면 됨.
@@ -23,12 +29,15 @@ export interface AIResponse {
  */
 const AI_ENDPOINT = process.env.NEXT_PUBLIC_AI_ENDPOINT || "/api/chat";
 
-export async function askAI(message: string): Promise<AIResponse> {
+export async function askAI(
+  message: string,
+  history: AITurn[] = []
+): Promise<AIResponse> {
   try {
     const res = await fetch(AI_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message, history }),
     });
     const data = await res.json();
     // 기존 소스가 어떤 키로 답하든 흡수: reply / text / message / content 순으로 탐색.

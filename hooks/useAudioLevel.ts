@@ -63,7 +63,8 @@ export function useAudioLevel(active: boolean) {
         const tick = () => {
           const analyser = analyserRef.current;
           if (!analyser) return;
-          analyser.getByteFrequencyData(dataRef.current);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          analyser.getByteFrequencyData(dataRef.current as any);
           let sum = 0;
           for (let i = 0; i < dataRef.current.length; i++) {
             sum += dataRef.current[i];
