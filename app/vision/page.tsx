@@ -9,6 +9,11 @@ import type { LinkNode } from "@/lib/linkNodes";
 
 // 핀치 변화량 → 카메라 거리 변화에 곱하는 이득. 클수록 줌이 민감.
 const ZOOM_GAIN = 12;
+// 손 비틀기 회전 제어
+const SPIN_DEAD = 0.28; // 브레이크 중립 구간(라디안, ±약 16°)
+const SPIN_GAIN = 0.06; // 기울인 각도 → 회전 속도 비례
+const SPIN_MAX = 0.09; // 최대 회전 속도(라디안/프레임)
+const ROLL_NEUTRAL = -Math.PI / 2; // 손 똑바로(손가락 위) = 중립
 
 export default function VisionPage() {
   const [active, setActive] = useState(false);
@@ -17,8 +22,8 @@ export default function VisionPage() {
   // 카메라 거리(=줌). 작아질수록 줌인. ParticleField가 ref로 읽음.
   const camRef = useRef(3.0);
   const lastPinch = useRef<number | null>(null);
-  // 손 위치 기반 회전 목표. null이면 자동회전.
-  const rotRef = useRef<{ yaw: number; pitch: number } | null>(null);
+  // 손 비틀기 → yaw 회전 "속도". null이면 자동회전.
+  const spinRef = useRef<number | null>(null);
   // 노드 상호작용용
   const pointerRef = useRef<{ x: number; y: number } | null>(null);
   const pinchRef = useRef(1);
@@ -33,7 +38,7 @@ export default function VisionPage() {
     if (f.detected) {
       pinchRef.current = f.pinch;
 
-      // 노드 위에 호버 중이면 줌 억제(핀치=선택 의도) — 아니면 줌
+      // 줌: 핀치 변화량 (노드 호버 중이면 억제 → 선택 의도)
       const overNode = hoverRef.current != null;
       if (lastPinch.current != null && !overNode) {
         const delta = f.pinch - lastPinch.current;
@@ -42,20 +47,30 @@ export default function VisionPage() {
       }
       lastPinch.current = f.pinch;
 
-      // 손 위치(거울모드) → 회전 + 포인터
+      // 포인터(셀렉용): 손 위치, 거울모드
       const pt = f.pointer ?? f.landmarks[9] ?? null;
-      if (pt) {
-        const mx = 1 - pt.x;
-        const my = pt.y;
-        pointerRef.current = { x: mx, y: my };
-        rotRef.current = {
-          yaw: (mx - 0.5) * 4.4,
-          pitch: (my - 0.5) * -3.0,
-        };
+      if (pt) pointerRef.current = { x: 1 - pt.x, y: pt.y };
+
+      // 회전(구 조작): 손 비틀기 각도 = 손목(0)→중지뿌리(9) 벡터 각도
+      const w = f.landmarks[0];
+      const m = f.landmarks[9];
+      if (w && m) {
+        const ang = Math.atan2(m.y - w.y, m.x - w.x);
+        // 중립(손 똑바로)에서의 편차를 -PI..PI로 정규화
+        let off = ang - ROLL_NEUTRAL;
+        off = Math.atan2(Math.sin(off), Math.cos(off));
+        // 거울모드 보정: 화면이 좌우반전이라 회전 방향 맞춤
+        off = -off;
+        if (Math.abs(off) <= SPIN_DEAD) {
+          spinRef.current = 0; // 브레이크(중립) → 정지
+        } else {
+          const eff = off - Math.sign(off) * SPIN_DEAD;
+          spinRef.current = Math.max(-SPIN_MAX, Math.min(SPIN_MAX, eff * SPIN_GAIN));
+        }
       }
     } else {
       lastPinch.current = null;
-      rotRef.current = null;
+      spinRef.current = null; // 손 없으면 자동회전
       pointerRef.current = null;
       pinchRef.current = 1;
     }
@@ -76,7 +91,7 @@ export default function VisionPage() {
       <div className="absolute inset-0">
         <ParticleField
           camRef={camRef}
-          rotRef={rotRef}
+          spinRef={spinRef}
           pointerRef={pointerRef}
           pinchRef={pinchRef}
           hoverRef={hoverRef}

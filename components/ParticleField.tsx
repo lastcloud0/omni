@@ -6,8 +6,8 @@ import { LINK_NODES, loadIcon, type LinkNode } from "@/lib/linkNodes";
 interface Props {
   /** 카메라 거리(=줌). 값이 작아질수록 구체 안으로 줌인. 부모가 ref로 제어. */
   camRef: React.MutableRefObject<number>;
-  /** 목표 회전 각(라디안). yaw=좌우(Y축), pitch=상하(X축). null이면 자동회전. */
-  rotRef?: React.MutableRefObject<{ yaw: number; pitch: number } | null>;
+  /** yaw 회전 "속도"(라디안/프레임). null이면 자동회전, 0이면 정지(브레이크). */
+  spinRef?: React.MutableRefObject<number | null>;
   /** 손 포인터(화면 정규화 0..1, 거울모드 반영됨). null이면 호버 없음. */
   pointerRef?: React.MutableRefObject<{ x: number; y: number } | null>;
   /** 현재 핀치값(작을수록 오므림). 노드 위 핀치 → 링크 열림. */
@@ -21,7 +21,7 @@ interface Props {
 
 const CAM_MIN = 0.5;
 const CAM_MAX = 3.4;
-const HIT_RADIUS = 46; // 호버 판정 반경(px)
+const HIT_RADIUS = 64; // 호버 판정 반경(px) — 널널하게
 const PINCH_CLICK = 0.05; // 이 값 아래로 오므리면 클릭
 
 /**
@@ -30,7 +30,7 @@ const PINCH_CLICK = 0.05; // 이 값 아래로 오므리면 클릭
  */
 export function ParticleField({
   camRef,
-  rotRef,
+  spinRef,
   pointerRef,
   pinchRef,
   hoverRef,
@@ -57,13 +57,12 @@ export function ParticleField({
       pts.push({ x: Math.cos(th) * r, y, z: Math.sin(th) * r });
     }
 
-    // 링크 노드도 구면에 고르게 배치 (반지름 살짝 키워 표면 위로)
+    // 링크 노드는 적도 부근 링에 배치 → yaw 회전만으로 다 앞으로 가져올 수 있음
     const nodes = LINK_NODES.map((n, i) => {
-      const k = LINK_NODES.length;
-      const y = 1 - ((i + 0.5) / k) * 2;
-      const r = Math.sqrt(1 - y * y);
-      const th = gold * (i + 1);
-      return { node: n, x: Math.cos(th) * r * 1.08, y: y * 1.08, z: Math.sin(th) * r * 1.08 };
+      const th = (i / LINK_NODES.length) * Math.PI * 2;
+      const yy = (i % 2 ? 0.18 : -0.18); // 위아래 살짝 엇갈리게
+      const rr = Math.sqrt(1 - yy * yy) * 1.06;
+      return { node: n, x: Math.cos(th) * rr, y: yy * 1.06, z: Math.sin(th) * rr };
     });
 
     // 아이콘 비동기 로드
@@ -92,14 +91,10 @@ export function ParticleField({
       const target = Math.max(CAM_MIN, Math.min(CAM_MAX, camRef.current));
       cam += (target - cam) * 0.18;
 
-      const rot = rotRef?.current ?? null;
-      if (rot) {
-        yaw += (rot.yaw - yaw) * 0.15;
-        pitch += (rot.pitch - pitch) * 0.15;
-      } else {
-        yaw += 0.0022;
-        pitch += (0 - pitch) * 0.05;
-      }
+      // 회전 속도 모델: 손 비틀기 각도 → yaw 속도(브레이크 중립). 손 없으면 자동회전.
+      const spin = spinRef?.current ?? null;
+      yaw += spin == null ? 0.0022 : spin;
+      pitch += (0 - pitch) * 0.05; // 항상 수평 유지
 
       ctx.clearRect(0, 0, W, H);
       const cx = W / 2, cy = H / 2;
@@ -220,7 +215,7 @@ export function ParticleField({
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
     };
-  }, [camRef, rotRef, pointerRef, pinchRef, hoverRef, count]);
+  }, [camRef, spinRef, pointerRef, pinchRef, hoverRef, count]);
 
   return <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" aria-hidden />;
 }
