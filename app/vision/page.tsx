@@ -5,6 +5,7 @@ import { HandTracker } from "@/components/HandTracker";
 import { ParticleField } from "@/components/ParticleField";
 import { useDraggable } from "@/hooks/useDraggable";
 import type { HandFrame } from "@/hooks/useHandTracking";
+import type { LinkNode } from "@/lib/linkNodes";
 
 // 핀치 변화량 → 카메라 거리 변화에 곱하는 이득. 클수록 줌이 민감.
 const ZOOM_GAIN = 12;
@@ -18,32 +19,45 @@ export default function VisionPage() {
   const lastPinch = useRef<number | null>(null);
   // 손 위치 기반 회전 목표. null이면 자동회전.
   const rotRef = useRef<{ yaw: number; pitch: number } | null>(null);
+  // 노드 상호작용용
+  const pointerRef = useRef<{ x: number; y: number } | null>(null);
+  const pinchRef = useRef(1);
+  const hoverRef = useRef<LinkNode | null>(null);
+
+  const openLink = (node: LinkNode) => {
+    window.open(node.url, "_blank", "noopener,noreferrer");
+  };
 
   const onFrame = (f: HandFrame) => {
     setFrame(f);
     if (f.detected) {
-      // 줌: 핀치 변화량 → 카메라 거리
-      if (lastPinch.current != null) {
-        const delta = f.pinch - lastPinch.current; // 음수면 오므리는 중 → 줌인
+      pinchRef.current = f.pinch;
+
+      // 노드 위에 호버 중이면 줌 억제(핀치=선택 의도) — 아니면 줌
+      const overNode = hoverRef.current != null;
+      if (lastPinch.current != null && !overNode) {
+        const delta = f.pinch - lastPinch.current;
         camRef.current += delta * ZOOM_GAIN;
         camRef.current = Math.max(0.5, Math.min(3.4, camRef.current));
       }
       lastPinch.current = f.pinch;
 
-      // 회전: 손 위치(거울모드 X, Y)를 화면 중앙 기준으로 → yaw/pitch
+      // 손 위치(거울모드) → 회전 + 포인터
       const pt = f.pointer ?? f.landmarks[9] ?? null;
       if (pt) {
-        const mx = 1 - pt.x; // 거울모드
+        const mx = 1 - pt.x;
         const my = pt.y;
-        // 중앙(0.5) 기준 -0.5..0.5 → 회전 범위(±약 130°)
+        pointerRef.current = { x: mx, y: my };
         rotRef.current = {
           yaw: (mx - 0.5) * 4.4,
-          pitch: (my - 0.5) * -3.0, // 손 올리면 위로 보임
+          pitch: (my - 0.5) * -3.0,
         };
       }
     } else {
       lastPinch.current = null;
-      rotRef.current = null; // 손 내리면 자동회전 복귀
+      rotRef.current = null;
+      pointerRef.current = null;
+      pinchRef.current = 1;
     }
   };
 
@@ -60,7 +74,15 @@ export default function VisionPage() {
     <main className="relative h-screen w-screen overflow-hidden">
       {/* 전체 화면 파티클 (프레임 없음) */}
       <div className="absolute inset-0">
-        <ParticleField camRef={camRef} rotRef={rotRef} count={900} />
+        <ParticleField
+          camRef={camRef}
+          rotRef={rotRef}
+          pointerRef={pointerRef}
+          pinchRef={pinchRef}
+          hoverRef={hoverRef}
+          onActivate={openLink}
+          count={400}
+        />
       </div>
 
       {/* 손 포인터 (전체 화면 기준) */}
