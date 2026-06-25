@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { buildKnowledgeBase } from "@/lib/knowledgeBase";
+import { getWeather, parseWeatherIntent } from "@/lib/weather";
 
 export const runtime = "nodejs";
 
@@ -63,6 +64,25 @@ export async function POST(req: Request) {
   }
   const turns: Turn[] = Array.isArray(history) ? history : [];
 
+  // 날씨 의도 감지 → 실제 데이터를 프롬프트에 주입(있으면 정확한 수치로 답함).
+  let weatherCtx = "";
+  const prevAssistant = [...turns].reverse().find((t) => t.role === "assistant")?.content;
+  const intent = parseWeatherIntent(message, prevAssistant);
+  if (intent.isWeather && intent.city) {
+    const wx = await getWeather(intent.city);
+    if (wx) {
+      weatherCtx =
+        `\n\n[실시간 날씨 데이터 — 이 수치를 근거로 답하라]\n` +
+        `${wx.city}${wx.country ? "(" + wx.country + ")" : ""}: ${wx.condition}, ` +
+        `현재 ${wx.temperature}°C(체감 ${wx.feelsLike}°C), 습도 ${wx.humidity}%, ` +
+        `풍속 ${wx.windSpeed}m/s`;
+    } else {
+      weatherCtx = `\n\n[참고] '${intent.city}' 날씨 데이터를 가져오지 못했다. 도시명을 다시 확인하도록 정중히 요청하라.`;
+    }
+  } else if (intent.isWeather && !intent.city) {
+    weatherCtx = `\n\n[참고] 사용자가 날씨를 물었으나 지역이 불명확하다. 어느 지역인지 정중히 되물어라.`;
+  }
+
   const apiKey = process.env.GEMINI_API_KEY;
 
   // 키가 없으면 에코 스텁 — 키 없이도 UI 시연 가능.
@@ -73,7 +93,7 @@ export async function POST(req: Request) {
   }
 
   const body = JSON.stringify({
-    system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+    system_instruction: { parts: [{ text: SYSTEM_PROMPT + weatherCtx }] },
     // 직전 대화(최근 12턴)를 함께 보내 맥락을 유지한다.
     // Gemini는 assistant 역할을 "model"로 표기한다.
     contents: [
