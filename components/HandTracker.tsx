@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useHandTracking, type HandFrame } from "@/hooks/useHandTracking";
 
 interface Props {
@@ -10,6 +10,14 @@ interface Props {
   /** 우하단 웹캠 프리뷰 표시 여부. */
   showPreview?: boolean;
 }
+
+// 프리뷰 크기 프리셋 (가로:세로 4:3 유지)
+const SIZES = {
+  sm: { w: 140, h: 105 },
+  md: { w: 200, h: 150 },
+  lg: { w: 300, h: 225 },
+} as const;
+type SizeKey = keyof typeof SIZES;
 
 // MediaPipe 손 연결 (관절 쌍) — 스켈레톤 라인.
 const CONNECTIONS: [number, number][] = [
@@ -31,21 +39,24 @@ export function HandTracker({ active, onFrame, showPreview = true }: Props) {
   const { ready, error, frame, frameRef } = useHandTracking(videoRef, active);
   const onFrameRef = useRef(onFrame);
   onFrameRef.current = onFrame;
+  const [sizeKey, setSizeKey] = useState<SizeKey>("md");
+  const [collapsed, setCollapsed] = useState(false);
+  const dim = SIZES[sizeKey];
 
   // 부모로 프레임 전달
   useEffect(() => {
     onFrameRef.current?.(frame);
   }, [frame]);
 
-  // 프리뷰 캔버스에 스켈레톤 그리기
+  // 프리뷰 캔버스에 스켈레톤 그리기 (크기 변경 시 재설정)
   useEffect(() => {
-    if (!showPreview) return;
+    if (!showPreview || collapsed) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    const W = (canvas.width = 200);
-    const H = (canvas.height = 150);
+    const W = (canvas.width = dim.w);
+    const H = (canvas.height = dim.h);
     let raf = 0;
     const draw = () => {
       ctx.clearRect(0, 0, W, H);
@@ -88,27 +99,23 @@ export function HandTracker({ active, onFrame, showPreview = true }: Props) {
     };
     draw();
     return () => cancelAnimationFrame(raf);
-  }, [showPreview, frameRef]);
+  }, [showPreview, frameRef, collapsed, dim.w, dim.h]);
 
-  if (!showPreview) return null;
+  // showPreview=false 여도 video는 마운트(추적 유지), 화면만 숨김.
+  if (!showPreview) {
+    return (
+      <video ref={videoRef} playsInline muted className="hidden" aria-hidden />
+    );
+  }
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-[200px] overflow-hidden rounded-xl border border-sky-400/30 bg-black/60 shadow-lg backdrop-blur">
-      <div className="relative">
-        {/* 웹캠 영상 (거울모드) */}
-        <video
-          ref={videoRef}
-          playsInline
-          muted
-          className="block h-[150px] w-[200px] -scale-x-100 object-cover opacity-70"
-        />
-        {/* 스켈레톤 오버레이 */}
-        <canvas
-          ref={canvasRef}
-          className="pointer-events-none absolute inset-0 h-[150px] w-[200px]"
-        />
-        {/* 상태 배지 */}
-        <div className="absolute left-2 top-2 flex items-center gap-1.5 rounded-full bg-black/50 px-2 py-1 text-[10px] tracking-wider">
+    <div
+      className="fixed bottom-4 right-4 z-50 overflow-hidden rounded-xl border border-sky-400/30 bg-black/60 shadow-lg backdrop-blur"
+      style={{ width: collapsed ? 140 : dim.w }}
+    >
+      {/* 컨트롤 바 */}
+      <div className="flex items-center justify-between gap-1 px-2 py-1">
+        <div className="flex items-center gap-1.5 text-[10px] tracking-wider">
           <span
             className={`h-2 w-2 rounded-full ${
               error
@@ -130,13 +137,55 @@ export function HandTracker({ active, onFrame, showPreview = true }: Props) {
               : "로딩…"}
           </span>
         </div>
+        <div className="flex items-center gap-0.5">
+          {!collapsed &&
+            (["sm", "md", "lg"] as SizeKey[]).map((k) => (
+              <button
+                key={k}
+                onClick={() => setSizeKey(k)}
+                className={`rounded px-1.5 py-0.5 text-[9px] font-medium transition ${
+                  sizeKey === k
+                    ? "bg-sky-500/30 text-sky-100"
+                    : "text-slate-400 hover:text-sky-200"
+                }`}
+              >
+                {k === "sm" ? "S" : k === "md" ? "M" : "L"}
+              </button>
+            ))}
+          <button
+            onClick={() => setCollapsed((v) => !v)}
+            aria-label={collapsed ? "펼치기" : "접기"}
+            className="rounded px-1.5 py-0.5 text-[10px] text-slate-400 transition hover:text-sky-200"
+          >
+            {collapsed ? "▢" : "—"}
+          </button>
+        </div>
+      </div>
+
+      {/* 미디어 영역 — video는 항상 마운트(ref 안정), 접으면 display:none */}
+      <div
+        className={`relative ${collapsed ? "hidden" : "block"}`}
+        style={{ width: dim.w, height: dim.h }}
+      >
+        <video
+          ref={videoRef}
+          playsInline
+          muted
+          className="block -scale-x-100 object-cover opacity-70"
+          style={{ width: dim.w, height: dim.h }}
+        />
+        <canvas
+          ref={canvasRef}
+          className="pointer-events-none absolute inset-0"
+          style={{ width: dim.w, height: dim.h }}
+        />
         {frame.detected && (
           <div className="absolute bottom-2 right-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-sky-200">
             pinch {frame.pinch.toFixed(2)}
           </div>
         )}
       </div>
-      {error && (
+      {error && !collapsed && (
         <div className="px-2 py-1 text-[10px] text-red-300">{error}</div>
       )}
     </div>
