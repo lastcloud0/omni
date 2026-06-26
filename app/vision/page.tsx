@@ -105,15 +105,24 @@ export default function VisionPage() {
     initial: { x: -9999, y: -9999, w: 430, h: 56 }, // 측정 전 화면 밖에 숨김
   });
   useEffect(() => {
-    const w = ctrlBoxRef.current?.offsetWidth ?? 430;
-    const h = ctrlBoxRef.current?.offsetHeight ?? 56;
-    setCtrl((b) => ({
-      ...b,
-      w,
-      h,
-      x: Math.max(8, Math.round(window.innerWidth / 2 - w / 2)),
-      y: window.innerHeight - h - 28,
-    }));
+    const place = () => {
+      const el = ctrlBoxRef.current;
+      if (!el) return;
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+      setCtrl((b) => ({
+        ...b,
+        w,
+        h,
+        x: Math.max(8, Math.round(window.innerWidth / 2 - w / 2)),
+        y: window.innerHeight - h - 28,
+      }));
+    };
+    place();
+    // 폰트 로딩 완료 후 폭이 바뀔 수 있어 한 번 더 정렬
+    if (document.fonts?.ready) document.fonts.ready.then(place);
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
