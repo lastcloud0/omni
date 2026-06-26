@@ -42,6 +42,11 @@ body {
   text-shadow: 0 0 6px rgba(56, 189, 248, 0.7), 0 0 18px rgba(56, 189, 248, 0.4);
 }
 
+/* 메타볼(세포분열) — 자식 요소들이 끈적하게 뭉치고 떨어지는 효과 */
+.goo {
+  filter: url(#goo-filter);
+}
+
 /* 글래스모피즘 표면 */
 .glass {
   background: rgba(255, 255, 255, 0.06);

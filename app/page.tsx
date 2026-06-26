@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useOmni } from "@/hooks/useOmni";
 import { useAudioLevel } from "@/hooks/useAudioLevel";
@@ -22,6 +22,14 @@ export default function Home() {
   const [draft, setDraft] = useState("");
   const [menu, setMenu] = useState(false); // 구체 호버/터치 시 위성 메뉴
   const [chatOpen, setChatOpen] = useState(false); // CHAT 모드(하단 대화 UI)
+  const closeT = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openMenu = () => {
+    if (closeT.current) clearTimeout(closeT.current);
+    setMenu(true);
+  };
+  const closeMenu = () => {
+    closeT.current = setTimeout(() => setMenu(false), 180); // 버튼으로 이동할 틈
+  };
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,52 +42,99 @@ export default function Home() {
 
   return (
     <main className="relative mx-auto flex min-h-screen w-full max-w-2xl flex-col items-center justify-between px-4 py-8 sm:px-5 sm:py-10">
-      {/* 중앙: 구체 + 호버 시 위성 버튼(액체 연결 느낌) */}
+      {/* goo(메타볼) 필터 정의 — 화면엔 안 보임 */}
+      <svg className="pointer-events-none absolute h-0 w-0" aria-hidden>
+        <defs>
+          <filter id="goo-filter">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="9" result="blur" />
+            <feColorMatrix
+              in="blur"
+              type="matrix"
+              values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -10"
+            />
+          </filter>
+        </defs>
+      </svg>
+
+      {/* 중앙: 구체 + 세포분열 위성 메뉴 */}
       <section className="flex flex-1 items-center justify-center">
         <div
           className="relative"
-          onMouseEnter={() => setMenu(true)}
-          onMouseLeave={() => setMenu(false)}
+          onMouseEnter={openMenu}
+          onMouseLeave={closeMenu}
         >
-          {/* 액체 연결 글로우 (구체 ↔ 버튼) — 메타볼 느낌의 부드러운 다리 */}
-          <div
-            className={`pointer-events-none absolute left-1/2 top-1/2 -z-0 h-24 -translate-y-1/2 rounded-full bg-sky-400/20 blur-2xl transition-all duration-500 ${
-              menu ? "w-64 opacity-100" : "w-0 opacity-0"
-            }`}
-            style={{ transformOrigin: "left center" }}
-          />
+          {/* 메타볼 블롭 레이어(데스크톱) — 구체에서 세포가 분열되어 나옴 */}
+          <div className="goo pointer-events-none absolute left-1/2 top-1/2 hidden h-0 w-0 sm:block">
+            {/* 본체(구체 우측에 붙는 큰 세포) */}
+            <span
+              className="absolute rounded-full bg-sky-400/55"
+              style={{ width: 96, height: 96, left: 40, top: -48 }}
+            />
+            {/* 분열 세포 1, 2 — 열리면 바깥으로 */}
+            {[{ y: -46 }, { y: 46 }].map((c, i) => (
+              <motion.span
+                key={i}
+                className="absolute rounded-full bg-sky-400/55"
+                initial={false}
+                animate={
+                  menu
+                    ? { x: 168, y: c.y, width: 56, height: 56, opacity: 1 }
+                    : { x: 48, y: 0, width: 70, height: 70, opacity: 1 }
+                }
+                transition={{ type: "spring", stiffness: 260, damping: 24, delay: i * 0.05 }}
+                style={{ left: -28, top: -28 }}
+              />
+            ))}
+          </div>
 
           <OmniOrb status={status} level={level} onClick={() => setMenu((m) => !m)} />
 
-          {/* 위성 버튼: 구체에서 솟아나오듯 등장 */}
+          {/* 실제 버튼(텍스트) — 블롭 위. 데스크톱은 우측 세포 위치에 정렬 */}
           <div
-            className={`absolute z-20 flex gap-2
-              left-1/2 top-full mt-3 -translate-x-1/2 flex-row
-              sm:left-full sm:top-1/2 sm:ml-5 sm:mt-0 sm:-translate-x-0 sm:-translate-y-1/2 sm:flex-col`}
+            className="absolute left-1/2 top-1/2 hidden sm:block"
+            onMouseEnter={openMenu}
+            onMouseLeave={closeMenu}
           >
             <motion.button
-              onClick={() => {
-                setChatOpen(true);
-                if (!awake) toggleAwake();
-              }}
+              onClick={() => { setChatOpen(true); if (!awake) toggleAwake(); }}
               initial={false}
-              animate={menu ? { opacity: 1, scale: 1, x: 0 } : { opacity: 0, scale: 0.5, x: -24 }}
-              transition={{ type: "spring", stiffness: 320, damping: 22 }}
-              style={{ pointerEvents: menu ? "auto" : "none" }}
-              className="rounded-2xl border border-sky-400/40 bg-sky-500/15 px-5 py-2.5 text-xs tracking-[0.2em] text-sky-100 backdrop-blur-md transition hover:bg-sky-500/25"
+              animate={menu ? { x: 168, y: -46, opacity: 1 } : { x: 40, y: 0, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 260, damping: 24 }}
+              style={{ left: -44, top: -16, pointerEvents: menu ? "auto" : "none" }}
+              className="absolute w-[88px] text-center text-xs font-medium tracking-[0.2em] text-sky-50"
             >
               CHAT
             </motion.button>
             <motion.a
               href="/vision"
               initial={false}
-              animate={menu ? { opacity: 1, scale: 1, x: 0 } : { opacity: 0, scale: 0.5, x: -24 }}
-              transition={{ type: "spring", stiffness: 320, damping: 22, delay: 0.04 }}
-              style={{ pointerEvents: menu ? "auto" : "none" }}
-              className="rounded-2xl border border-white/15 bg-white/[0.07] px-5 py-2.5 text-xs tracking-[0.2em] text-slate-100 backdrop-blur-md transition hover:border-sky-400/50 hover:text-sky-100"
+              animate={menu ? { x: 168, y: 46, opacity: 1 } : { x: 40, y: 0, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 260, damping: 24, delay: 0.05 }}
+              style={{ left: -44, top: -16, pointerEvents: menu ? "auto" : "none" }}
+              className="absolute w-[88px] text-center text-xs font-medium tracking-[0.2em] text-sky-50"
             >
               VISION
             </motion.a>
+          </div>
+
+          {/* 모바일 메뉴 (아래, 단순 페이드) */}
+          <div
+            className={`absolute left-1/2 top-full z-20 mt-3 flex -translate-x-1/2 gap-2 transition-opacity duration-300 sm:hidden ${
+              menu ? "opacity-100" : "pointer-events-none opacity-0"
+            }`}
+          >
+            <button
+              onClick={() => { setChatOpen(true); if (!awake) toggleAwake(); }}
+              className="rounded-2xl border border-sky-400/40 bg-sky-500/15 px-5 py-2.5 text-xs tracking-[0.2em] text-sky-100 backdrop-blur-md"
+            >
+              CHAT
+            </button>
+            <a
+              href="/vision"
+              className="rounded-2xl border border-white/15 bg-white/[0.07] px-5 py-2.5 text-xs tracking-[0.2em] text-slate-100 backdrop-blur-md"
+            >
+              VISION
+            </a>
           </div>
         </div>
       </section>
