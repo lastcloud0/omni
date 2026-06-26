@@ -9,11 +9,11 @@ import type { LinkNode } from "@/lib/linkNodes";
 
 // 줌 제어 (직관적: 핀치 변화량 = 줌, 반응 빠름)
 const ZOOM_GAIN = 14;
-const PINCH_REST = 0.13; // 평소(열린 손) 핀치값 — 줌 의도 세기 비교 기준
 // 회전/줌 동시동작 방지 — 더 강한 동작만 (정규화 기준값)
-const ROT_NORM = 1.2; // 이 정도 비틀면 회전 강도 ~1
-const ZOOM_NORM = 0.07; // 이 정도 핀치 차이면 줌 강도 ~1
-const MODE_HYST = 1.3; // 모드 전환 히스테리시스(깜빡임 방지)
+const ROT_NORM = 0.6; // 이 정도 비틀면 회전 강도 ~1 (약 50°)
+const ZOOM_VEL_DEAD = 0.004; // 핀치 지터 무시
+const ZOOM_VEL_NORM = 0.012; // 이 속도로 핀치 변하면 줌 강도 ~1
+const MODE_HYST = 1.15; // 모드 전환 히스테리시스(깜빡임 방지)
 // 손 비틀기 회전 제어
 const SPIN_DEAD = 0.28; // 브레이크 중립 구간(라디안, ±약 16°)
 const SPIN_GAIN = 0.06; // 기울인 각도 → 회전 속도 비례
@@ -65,8 +65,9 @@ export default function VisionPage() {
         }
       }
 
-      // --- 줌 의도: 핀치가 평소에서 벗어난 정도 ---
-      const zoomStrength = Math.abs(f.pinch - PINCH_REST) / ZOOM_NORM;
+      // --- 줌 의도: 핀치 "변화 속도"(가만히 비틀 땐 0 → 회전이 이김) ---
+      const delta = lastPinch.current != null ? f.pinch - lastPinch.current : 0;
+      const zoomStrength = Math.max(0, Math.abs(delta) - ZOOM_VEL_DEAD) / ZOOM_VEL_NORM;
 
       // --- 더 강한 동작만 채택 (히스테리시스로 깜빡임 방지) ---
       const overNode = hoverRef.current != null;
@@ -82,16 +83,15 @@ export default function VisionPage() {
       spinRef.current = modeRef.current === "rot" ? spinTarget : 0;
 
       // 줌 적용 (직관적: 핀치 변화량)
-      if (modeRef.current === "zoom" && lastPinch.current != null) {
-        const delta = f.pinch - lastPinch.current; // 음수=오므림 → 줌인
-        camRef.current += delta * ZOOM_GAIN;
+      if (modeRef.current === "zoom") {
+        camRef.current += delta * ZOOM_GAIN; // 음수=오므림 → 줌인
         camRef.current = Math.max(0.5, Math.min(3.4, camRef.current));
       }
       lastPinch.current = f.pinch;
     } else {
       spinRef.current = null; // 손 없으면 자동회전
       pointerRef.current = null;
-      pinchRef.current = PINCH_REST;
+      pinchRef.current = 1;
       lastPinch.current = null;
       modeRef.current = null;
     }
