@@ -60,8 +60,8 @@ export default function Home() {
           {/* 미니 코어 버튼 — 메인코어 중심에서 솟아나와 오른쪽에 나란히.
               (추후 개수 늘면 dx/dy를 원호로 배치해 균형 유지) */}
           {[
-            { label: "CHAT", dx: 168, dy: 0, onClick: () => { setChatOpen(true); if (!awake) toggleAwake(); } },
-            { label: "VISION", dx: 256, dy: 0, href: "/vision" },
+            { label: "VISION", dx: 188, dy: -150, href: "/vision" },
+            { label: "CHAT", dx: 230, dy: 88, onClick: () => { setChatOpen(true); if (!awake) toggleAwake(); } },
           ].map((b, i) => {
             const common = {
               initial: false as const,
