@@ -20,7 +20,8 @@ export default function Home() {
   const micActive = awake && (status === "listening" || status === "responding");
   const { level } = useAudioLevel(micActive);
   const [draft, setDraft] = useState("");
-  const [menu, setMenu] = useState(false); // 구체 호버/터치 시 액션 메뉴
+  const [menu, setMenu] = useState(false); // 구체 호버/터치 시 위성 메뉴
+  const [chatOpen, setChatOpen] = useState(false); // CHAT 모드(하단 대화 UI)
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,46 +34,66 @@ export default function Home() {
 
   return (
     <main className="relative mx-auto flex min-h-screen w-full max-w-2xl flex-col items-center justify-between px-4 py-8 sm:px-5 sm:py-10">
-      {/* 타이틀 — 좌상단 고정 */}
-      <span className="absolute left-5 top-5 text-[13px] font-light tracking-[0.45em] text-sky-300/90">
-        O M N I
-      </span>
-
-      {/* 중앙: 구체 (밑에 텍스트 없음) + 호버 시 VISION/CHAT 메뉴 */}
+      {/* 중앙: 구체 + 호버 시 위성 버튼(액체 연결 느낌) */}
       <section className="flex flex-1 items-center justify-center">
         <div
           className="relative"
           onMouseEnter={() => setMenu(true)}
           onMouseLeave={() => setMenu(false)}
         >
+          {/* 액체 연결 글로우 (구체 ↔ 버튼) — 메타볼 느낌의 부드러운 다리 */}
+          <div
+            className={`pointer-events-none absolute left-1/2 top-1/2 -z-0 h-24 -translate-y-1/2 rounded-full bg-sky-400/20 blur-2xl transition-all duration-500 ${
+              menu ? "w-64 opacity-100" : "w-0 opacity-0"
+            }`}
+            style={{ transformOrigin: "left center" }}
+          />
+
           <OmniOrb status={status} level={level} onClick={() => setMenu((m) => !m)} />
 
-          {/* 호버/터치 시 옆(데스크톱)·아래(모바일)에 뜨는 액션 버튼 */}
+          {/* 위성 버튼: 구체에서 솟아나오듯 등장 */}
           <div
-            className={`absolute z-20 flex gap-2 transition-all duration-300
+            className={`absolute z-20 flex gap-2
               left-1/2 top-full mt-3 -translate-x-1/2 flex-row
-              sm:left-full sm:top-1/2 sm:ml-4 sm:mt-0 sm:-translate-x-0 sm:-translate-y-1/2 sm:flex-col
-              ${menu ? "opacity-100" : "pointer-events-none opacity-0"}`}
+              sm:left-full sm:top-1/2 sm:ml-5 sm:mt-0 sm:-translate-x-0 sm:-translate-y-1/2 sm:flex-col`}
           >
-            <button
-              onClick={toggleAwake}
-              className={`rounded-xl border px-4 py-2 text-xs tracking-[0.2em] backdrop-blur transition ${
-                awake
-                  ? "border-sky-400/60 bg-sky-500/20 text-sky-100"
-                  : "border-white/15 bg-white/[0.06] text-slate-200 hover:border-sky-400/50 hover:text-sky-100"
-              }`}
+            <motion.button
+              onClick={() => {
+                setChatOpen(true);
+                if (!awake) toggleAwake();
+              }}
+              initial={false}
+              animate={menu ? { opacity: 1, scale: 1, x: 0 } : { opacity: 0, scale: 0.5, x: -24 }}
+              transition={{ type: "spring", stiffness: 320, damping: 22 }}
+              style={{ pointerEvents: menu ? "auto" : "none" }}
+              className="rounded-2xl border border-sky-400/40 bg-sky-500/15 px-5 py-2.5 text-xs tracking-[0.2em] text-sky-100 backdrop-blur-md transition hover:bg-sky-500/25"
             >
-              {awake ? "● CHAT" : "CHAT"}
-            </button>
-            <a
+              CHAT
+            </motion.button>
+            <motion.a
               href="/vision"
-              className="rounded-xl border border-white/15 bg-white/[0.06] px-4 py-2 text-xs tracking-[0.2em] text-slate-200 backdrop-blur transition hover:border-sky-400/50 hover:text-sky-100"
+              initial={false}
+              animate={menu ? { opacity: 1, scale: 1, x: 0 } : { opacity: 0, scale: 0.5, x: -24 }}
+              transition={{ type: "spring", stiffness: 320, damping: 22, delay: 0.04 }}
+              style={{ pointerEvents: menu ? "auto" : "none" }}
+              className="rounded-2xl border border-white/15 bg-white/[0.07] px-5 py-2.5 text-xs tracking-[0.2em] text-slate-100 backdrop-blur-md transition hover:border-sky-400/50 hover:text-sky-100"
             >
               VISION
-            </a>
+            </motion.a>
           </div>
         </div>
       </section>
+
+      {/* CHAT 모드일 때만 하단 대화 UI 표시 */}
+      {chatOpen && (
+      <>
+      {/* 닫기 */}
+      <button
+        onClick={() => setChatOpen(false)}
+        className="absolute right-5 top-5 text-[11px] tracking-widest text-slate-500 transition hover:text-sky-300"
+      >
+        CLOSE ✕
+      </button>
 
       {/* 대화 로그 (최근 몇 개만, 미니멀) */}
       <section className="flex w-full flex-col gap-2.5 pb-4">
@@ -164,6 +185,8 @@ export default function Home() {
           </div>
         )}
       </section>
+      </>
+      )}
     </main>
   );
 }
