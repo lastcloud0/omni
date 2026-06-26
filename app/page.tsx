@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useOmni } from "@/hooks/useOmni";
 import { useAudioLevel } from "@/hooks/useAudioLevel";
 import { OmniOrb } from "@/components/OmniOrb";
+import { MiniOrb } from "@/components/MiniOrb";
 
 export default function Home() {
   const {
@@ -28,7 +29,7 @@ export default function Home() {
     setMenu(true);
   };
   const closeMenu = () => {
-    closeT.current = setTimeout(() => setMenu(false), 180); // 버튼으로 이동할 틈
+    closeT.current = setTimeout(() => setMenu(false), 260); // 버튼으로 이동할 틈
   };
 
   const submit = (e: React.FormEvent) => {
@@ -47,98 +48,53 @@ export default function Home() {
         O M N I
       </span>
 
-      {/* goo(메타볼) 필터 정의 — 화면엔 안 보임 */}
-      <svg className="pointer-events-none absolute h-0 w-0" aria-hidden>
-        <defs>
-          <filter id="goo-filter">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="9" result="blur" />
-            <feColorMatrix
-              in="blur"
-              type="matrix"
-              values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -10"
-            />
-          </filter>
-        </defs>
-      </svg>
-
-      {/* 중앙: 구체 + 세포분열 위성 메뉴 */}
+      {/* 중앙: 구체 + 세포분열 미니코어 위성 메뉴 */}
       <section className="flex flex-1 items-center justify-center">
-        <div
-          className="relative"
-          onMouseEnter={openMenu}
-          onMouseLeave={closeMenu}
-        >
-          {/* 메타볼 블롭 레이어(데스크톱) — 구체에서 세포가 분열되어 나옴 */}
-          <div className="goo pointer-events-none absolute left-1/2 top-1/2 hidden h-0 w-0 sm:block">
-            {/* 본체(구체 우측에 붙는 큰 세포) */}
-            <span
-              className="absolute rounded-full bg-sky-400/55"
-              style={{ width: 96, height: 96, left: 40, top: -48 }}
-            />
-            {/* 분열 세포 1, 2 — 열리면 바깥으로 */}
-            {[{ y: -46 }, { y: 46 }].map((c, i) => (
-              <motion.span
-                key={i}
-                className="absolute rounded-full bg-sky-400/55"
-                initial={false}
-                animate={
-                  menu
-                    ? { x: 168, y: c.y, width: 56, height: 56, opacity: 1 }
-                    : { x: 48, y: 0, width: 70, height: 70, opacity: 1 }
-                }
-                transition={{ type: "spring", stiffness: 260, damping: 24, delay: i * 0.05 }}
-                style={{ left: -28, top: -28 }}
-              />
-            ))}
-          </div>
-
+        <div className="relative" onMouseEnter={openMenu} onMouseLeave={closeMenu}>
           <OmniOrb status={status} level={level} onClick={() => setMenu((m) => !m)} />
 
-          {/* 실제 버튼(텍스트) — 블롭 위. 데스크톱은 우측 세포 위치에 정렬 */}
-          <div
-            className="absolute left-1/2 top-1/2 hidden sm:block"
-            onMouseEnter={openMenu}
-            onMouseLeave={closeMenu}
-          >
-            <motion.button
-              onClick={() => { setChatOpen(true); if (!awake) toggleAwake(); }}
-              initial={false}
-              animate={menu ? { x: 168, y: -46, opacity: 1 } : { x: 40, y: 0, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 260, damping: 24 }}
-              style={{ left: -44, top: -16, pointerEvents: menu ? "auto" : "none" }}
-              className="absolute w-[88px] text-center text-xs font-medium tracking-[0.2em] text-sky-50"
-            >
-              CHAT
-            </motion.button>
-            <motion.a
-              href="/vision"
-              initial={false}
-              animate={menu ? { x: 168, y: 46, opacity: 1 } : { x: 40, y: 0, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 260, damping: 24, delay: 0.05 }}
-              style={{ left: -44, top: -16, pointerEvents: menu ? "auto" : "none" }}
-              className="absolute w-[88px] text-center text-xs font-medium tracking-[0.2em] text-sky-50"
-            >
-              VISION
-            </motion.a>
-          </div>
+          {/* 미니 코어 버튼 — 구체 중심에서 솟아나옴. 각 버튼이 직접 hover 유지 */}
+          {[
+            { label: "CHAT", dx: 150, dy: -46, onClick: () => { setChatOpen(true); if (!awake) toggleAwake(); } },
+            { label: "VISION", dx: 150, dy: 46, href: "/vision" },
+          ].map((b, i) => {
+            const common = {
+              onMouseEnter: openMenu,
+              onMouseLeave: closeMenu,
+              initial: false as const,
+              animate: menu
+                ? { x: b.dx, y: b.dy, scale: 1, opacity: 1 }
+                : { x: 0, y: 0, scale: 0.2, opacity: 0 },
+              transition: { type: "spring" as const, stiffness: 280, damping: 22, delay: i * 0.05 },
+              style: {
+                left: -32,
+                top: -32,
+                pointerEvents: (menu ? "auto" : "none") as "auto" | "none",
+              },
+              className: "absolute left-1/2 top-1/2 z-20 hidden sm:block",
+            };
+            return b.href ? (
+              <motion.a key={b.label} href={b.href} {...common}>
+                <MiniOrb label={b.label} size={64} />
+              </motion.a>
+            ) : (
+              <motion.button key={b.label} onClick={b.onClick} {...common}>
+                <MiniOrb label={b.label} size={64} />
+              </motion.button>
+            );
+          })}
 
-          {/* 모바일 메뉴 (아래, 단순 페이드) */}
+          {/* 모바일: 구체 아래 미니코어 2개 */}
           <div
-            className={`absolute left-1/2 top-full z-20 mt-3 flex -translate-x-1/2 gap-2 transition-opacity duration-300 sm:hidden ${
+            className={`absolute left-1/2 top-full z-20 mt-4 flex -translate-x-1/2 gap-4 transition-opacity duration-300 sm:hidden ${
               menu ? "opacity-100" : "pointer-events-none opacity-0"
             }`}
           >
-            <button
-              onClick={() => { setChatOpen(true); if (!awake) toggleAwake(); }}
-              className="rounded-2xl border border-sky-400/40 bg-sky-500/15 px-5 py-2.5 text-xs tracking-[0.2em] text-sky-100 backdrop-blur-md"
-            >
-              CHAT
+            <button onClick={() => { setChatOpen(true); if (!awake) toggleAwake(); }}>
+              <MiniOrb label="CHAT" size={60} />
             </button>
-            <a
-              href="/vision"
-              className="rounded-2xl border border-white/15 bg-white/[0.07] px-5 py-2.5 text-xs tracking-[0.2em] text-slate-100 backdrop-blur-md"
-            >
-              VISION
+            <a href="/vision">
+              <MiniOrb label="VISION" size={60} />
             </a>
           </div>
         </div>
