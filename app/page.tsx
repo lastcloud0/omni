@@ -51,6 +51,14 @@ export default function Home() {
       {/* 중앙: 구체 + 세포분열 미니코어 위성 메뉴 */}
       <section className="flex flex-1 items-center justify-center">
         <div className="relative" onMouseEnter={openMenu} onMouseLeave={closeMenu}>
+          {/* 넉넉한 hit-area — 구체에서 한참 멀어져야 이탈 인식 */}
+          <div
+            className="absolute left-1/2 top-1/2 z-0 -translate-x-1/2 -translate-y-1/2 rounded-full"
+            style={{ width: 620, height: 480, maxWidth: "96vw" }}
+            onMouseEnter={openMenu}
+            onMouseLeave={closeMenu}
+          />
+
           <OmniOrb status={status} level={level} onClick={() => setMenu((m) => !m)} />
 
           {/* 미니 코어 버튼 — 구체 중심에서 솟아나옴. 각 버튼이 직접 hover 유지 */}

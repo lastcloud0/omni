@@ -18,12 +18,13 @@ export function MiniOrb({ label, size = 60, active = false }: Props) {
       style={{
         width: size,
         height: size,
+        // 큰 코어와 동일 톤의 어두운 글래스 구체 (내부 그라디언트 없음)
         background:
-          "radial-gradient(circle at 38% 32%, #a5f3ff 0%, #38bdf8 38%, #3b5bdb 72%, #1e1b4b 100%)",
-        border: "1px solid rgba(165,243,255,0.35)",
+          "radial-gradient(circle at 50% 38%, #14151f 0%, #0a0a12 55%, #050507 100%)",
+        border: "1px solid rgba(165,243,255,0.30)",
         boxShadow: active
-          ? "0 0 22px rgba(56,189,248,0.7), inset 0 1px 6px rgba(255,255,255,0.25)"
-          : "0 0 14px rgba(56,189,248,0.4), inset 0 1px 6px rgba(255,255,255,0.2)",
+          ? "0 0 22px rgba(56,189,248,0.6), inset 0 1px 8px rgba(255,255,255,0.10)"
+          : "0 0 16px rgba(56,189,248,0.4), inset 0 1px 8px rgba(255,255,255,0.08)",
       }}
     >
       {/* 상단 광택 */}
@@ -31,7 +32,7 @@ export function MiniOrb({ label, size = 60, active = false }: Props) {
         className="pointer-events-none absolute inset-0 rounded-full"
         style={{
           background:
-            "radial-gradient(ellipse 50% 30% at 40% 26%, rgba(255,255,255,0.35), transparent 60%)",
+            "radial-gradient(ellipse 50% 28% at 42% 26%, rgba(255,255,255,0.18), transparent 60%)",
         }}
       />
       <span
