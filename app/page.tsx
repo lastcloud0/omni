@@ -42,6 +42,11 @@ export default function Home() {
 
   return (
     <main className="relative mx-auto flex min-h-screen w-full max-w-2xl flex-col items-center justify-between px-4 py-8 sm:px-5 sm:py-10">
+      {/* 네임 — 상단 중앙 */}
+      <span className="absolute left-1/2 top-6 -translate-x-1/2 text-[13px] font-light tracking-[0.5em] text-sky-300/80">
+        O M N I
+      </span>
+
       {/* goo(메타볼) 필터 정의 — 화면엔 안 보임 */}
       <svg className="pointer-events-none absolute h-0 w-0" aria-hidden>
         <defs>
