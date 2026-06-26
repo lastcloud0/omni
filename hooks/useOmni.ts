@@ -122,6 +122,17 @@ export function useOmni({ onPanel }: OmniOptions = {}) {
     onFinal: handleFinal,
   });
 
+  // 접속 시 기본 상태 = 음성 인식 ON (브라우저가 막으면 사용자 조작 시 시작).
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (supported && !autoStarted.current) {
+      autoStarted.current = true;
+      setAwake(true);
+      start();
+      setStatus("listening");
+    }
+  }, [supported, start]);
+
   const toggleAwake = useCallback(() => {
     setAwake((prev) => {
       const next = !prev;
