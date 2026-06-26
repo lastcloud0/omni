@@ -70,8 +70,8 @@ export default function Home() {
                 : { x: 0, y: 0, scale: 0.2, opacity: 0 },
               transition: { type: "spring" as const, stiffness: 280, damping: 22, delay: i * 0.05 },
               style: {
-                left: -32,
-                top: -32,
+                marginLeft: -32, // 버튼(64) 절반 보정 → 중심이 코어 중심에 일치
+                marginTop: -32,
                 pointerEvents: (menu ? "auto" : "none") as "auto" | "none",
               },
               className: "absolute left-1/2 top-1/2 z-20 hidden sm:block",
