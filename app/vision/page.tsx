@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { HandTracker } from "@/components/HandTracker";
 import { ParticleField } from "@/components/ParticleField";
 import { useDraggable } from "@/hooks/useDraggable";
@@ -99,12 +99,18 @@ export default function VisionPage() {
 
   const pinching = frame ? frame.pinch < 0.06 : false;
 
-  // 하단 중앙 시작, 드래그로 이동 가능한 컨트롤 박스.
-  const ctrlInit =
-    typeof window !== "undefined"
-      ? { x: window.innerWidth / 2 - 215, y: window.innerHeight - 80, w: 430, h: 56 }
-      : { x: 40, y: 40, w: 430, h: 56 };
-  const { box: ctrl, dragProps: ctrlDrag } = useDraggable({ initial: ctrlInit });
+  // 드래그 가능한 컨트롤 박스. 마운트 후 중앙 하단으로 위치.
+  const { box: ctrl, setBox: setCtrl, dragProps: ctrlDrag } = useDraggable({
+    initial: { x: 0, y: 0, w: 430, h: 56 },
+  });
+  useEffect(() => {
+    setCtrl((b) => ({
+      ...b,
+      x: Math.max(8, window.innerWidth / 2 - b.w / 2),
+      y: window.innerHeight - b.h - 28,
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <main className="relative h-screen w-screen overflow-hidden">
