@@ -34,16 +34,38 @@ export async function speak(text: string): Promise<void> {
   }
 
   // Fallback: browser speech synthesis.
-  if (typeof window !== "undefined" && "speechSynthesis" in window) {
-    await new Promise<void>((resolve) => {
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = "ko-KR";
-      u.rate = 1.02;
-      u.pitch = 0.9;
-      u.onend = () => resolve();
-      u.onerror = () => resolve();
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(u);
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+
+  const synth = window.speechSynthesis;
+  // 음성 목록은 비동기로 로드됨 — 비어 있으면 한 번 기다린다.
+  const getVoices = () =>
+    new Promise<SpeechSynthesisVoice[]>((resolve) => {
+      const v = synth.getVoices();
+      if (v.length) return resolve(v);
+      const onVoices = () => {
+        synth.removeEventListener("voiceschanged", onVoices);
+        resolve(synth.getVoices());
+      };
+      synth.addEventListener("voiceschanged", onVoices);
+      setTimeout(() => resolve(synth.getVoices()), 800); // 안전망
     });
-  }
+
+  const voices = await getVoices();
+  const koVoice =
+    voices.find((v) => v.lang === "ko-KR") ||
+    voices.find((v) => v.lang?.startsWith("ko"));
+
+  await new Promise<void>((resolve) => {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "ko-KR";
+    if (koVoice) u.voice = koVoice;
+    u.rate = 1.02;
+    u.pitch = 0.9;
+    u.onend = () => resolve();
+    u.onerror = () => resolve();
+    synth.cancel();
+    synth.speak(u);
+    // 크롬이 가끔 멈춤 → 살짝 깨워줌
+    setTimeout(() => synth.resume(), 100);
+  });
 }
