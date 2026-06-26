@@ -7,7 +7,11 @@ import { askAI } from "@/lib/aiClient";
 import { validateReply } from "@/lib/validation";
 import { useSpeechRecognition } from "./useSpeechRecognition";
 
-const WAKE_WORDS = ["옴니", "오므니", "옴리", "omni"];
+// "옴니"는 음성인식에서 없니/엄니/온니 등으로 자주 오인식됨 → 변형 폭넓게 허용.
+const WAKE_WORDS = [
+  "옴니", "오므니", "옴리", "omni",
+  "없니", "엄니", "온니", "옹니", "음니", "어미니", "오미니", "옴니야",
+];
 const STORAGE_KEY = "omni.chatlog.v1";
 
 function hasWakeWord(text: string): boolean {
@@ -41,6 +45,7 @@ export function useOmni({ onPanel }: OmniOptions = {}) {
   onPanelRef.current = onPanel;
   const [status, setStatus] = useState<OmniStatus>("idle");
   const [awake, setAwake] = useState(false); // wake-word toggle (mic armed)
+  const [interacted, setInteracted] = useState(false); // "옴니" 인식으로 활성화됐는지
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const busyRef = useRef(false);
   // respondTo에서 최신 대화 기록을 stale 없이 읽기 위한 거울.
@@ -105,6 +110,7 @@ export function useOmni({ onPanel }: OmniOptions = {}) {
     (text: string) => {
       if (busyRef.current) return;
       if (hasWakeWord(text)) {
+        setInteracted(true); // "옴니" 인식 → 활성화
         const command = stripWakeWord(text);
         if (command) {
           respondTo(command);
@@ -150,7 +156,10 @@ export function useOmni({ onPanel }: OmniOptions = {}) {
   // Manual text command (typed in the console input) — bypasses wake word.
   const sendText = useCallback(
     (text: string) => {
-      if (text.trim()) respondTo(text.trim());
+      if (text.trim()) {
+        setInteracted(true);
+        respondTo(text.trim());
+      }
     },
     [respondTo]
   );
@@ -160,6 +169,7 @@ export function useOmni({ onPanel }: OmniOptions = {}) {
   return {
     status,
     awake,
+    interacted,
     listening,
     interim,
     supported,

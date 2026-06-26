@@ -11,6 +11,7 @@ export default function Home() {
   const {
     status,
     awake,
+    interacted,
     interim,
     messages,
     toggleAwake,
@@ -103,27 +104,25 @@ export default function Home() {
             </a>
           </div>
 
-          {/* 받아쓰기 / 응답 자막 — 메인코어 바로 아래 */}
-          <div
-            className="pointer-events-none absolute left-1/2 top-1/2 w-[min(90vw,520px)] text-center"
-            style={{ transform: "translate(-50%, 180px)" }}
-          >
-            {interim ? (
-              <p className="text-base text-sky-200/90">“{interim}”</p>
-            ) : lastMsg ? (
-              <p
-                className={`text-sm leading-relaxed ${
-                  lastMsg.role === "assistant" ? "text-slate-200" : "text-sky-300/70"
-                }`}
-              >
-                {lastMsg.content}
-              </p>
-            ) : (
-              <p className="text-xs tracking-[0.2em] text-slate-500">
-                {awake ? "듣고 있습니다…" : ""}
-              </p>
-            )}
-          </div>
+          {/* 받아쓰기 / 응답 자막 — "옴니" 활성화 후에만 표시 */}
+          {interacted && (
+            <div
+              className="pointer-events-none absolute left-1/2 top-1/2 w-[min(90vw,520px)] text-center"
+              style={{ transform: "translate(-50%, 180px)" }}
+            >
+              {interim ? (
+                <p className="text-base text-sky-200/90">“{interim}”</p>
+              ) : lastMsg ? (
+                <p
+                  className={`text-sm leading-relaxed ${
+                    lastMsg.role === "assistant" ? "text-slate-200" : "text-sky-300/70"
+                  }`}
+                >
+                  {lastMsg.content}
+                </p>
+              ) : null}
+            </div>
+          )}
         </div>
       </section>
 
