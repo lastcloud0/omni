@@ -61,10 +61,11 @@ export default function Home() {
 
           <OmniOrb status={status} level={level} onClick={() => setMenu((m) => !m)} />
 
-          {/* 미니 코어 버튼 — 구체 중심에서 솟아나옴. 각 버튼이 직접 hover 유지 */}
+          {/* 미니 코어 버튼 — 구체 오른쪽에 가로로 나란히. 중심에서 솟아나옴.
+              (추후 개수 늘면 dx/dy를 원호로 배치해 균형 유지) */}
           {[
-            { label: "CHAT", dx: 150, dy: -46, onClick: () => { setChatOpen(true); if (!awake) toggleAwake(); } },
-            { label: "VISION", dx: 150, dy: 46, href: "/vision" },
+            { label: "CHAT", dx: 168, dy: 0, onClick: () => { setChatOpen(true); if (!awake) toggleAwake(); } },
+            { label: "VISION", dx: 256, dy: 0, href: "/vision" },
           ].map((b, i) => {
             const common = {
               onMouseEnter: openMenu,
