@@ -50,26 +50,22 @@ export default function Home() {
 
       {/* 중앙: 구체 + 세포분열 미니코어 위성 메뉴 */}
       <section className="flex flex-1 items-center justify-center">
-        <div className="relative" onMouseEnter={openMenu} onMouseLeave={closeMenu}>
-          {/* 넉넉한 hit-area — 구체에서 한참 멀어져야 이탈 인식 */}
-          <div
-            className="absolute left-1/2 top-1/2 z-0 -translate-x-1/2 -translate-y-1/2 rounded-full"
-            style={{ width: 620, height: 480, maxWidth: "96vw" }}
-            onMouseEnter={openMenu}
-            onMouseLeave={closeMenu}
-          />
-
+        {/* 호버 기준 = 이 원 하나 (메인코어 + 약 200px). 경계가 단일이라 깜빡임 없음 */}
+        <div
+          className="relative flex items-center justify-center rounded-full"
+          style={{ width: 680, height: 680, maxWidth: "92vw", maxHeight: "70vh" }}
+          onMouseEnter={openMenu}
+          onMouseLeave={closeMenu}
+        >
           <OmniOrb status={status} level={level} onClick={() => setMenu((m) => !m)} />
 
-          {/* 미니 코어 버튼 — 구체 오른쪽에 가로로 나란히. 중심에서 솟아나옴.
+          {/* 미니 코어 버튼 — 메인코어 중심에서 솟아나와 오른쪽에 나란히.
               (추후 개수 늘면 dx/dy를 원호로 배치해 균형 유지) */}
           {[
             { label: "CHAT", dx: 168, dy: 0, onClick: () => { setChatOpen(true); if (!awake) toggleAwake(); } },
             { label: "VISION", dx: 256, dy: 0, href: "/vision" },
           ].map((b, i) => {
             const common = {
-              onMouseEnter: openMenu,
-              onMouseLeave: closeMenu,
               initial: false as const,
               animate: menu
                 ? { x: b.dx, y: b.dy, scale: 1, opacity: 1 }
@@ -93,11 +89,12 @@ export default function Home() {
             );
           })}
 
-          {/* 모바일: 구체 아래 미니코어 2개 */}
+          {/* 모바일: 구체 아래 미니코어 2개 (코어 중심 기준 아래로) */}
           <div
-            className={`absolute left-1/2 top-full z-20 mt-4 flex -translate-x-1/2 gap-4 transition-opacity duration-300 sm:hidden ${
+            className={`absolute left-1/2 top-1/2 z-20 flex gap-4 transition-opacity duration-300 sm:hidden ${
               menu ? "opacity-100" : "pointer-events-none opacity-0"
             }`}
+            style={{ transform: "translate(-50%, 160px)" }}
           >
             <button onClick={() => { setChatOpen(true); if (!awake) toggleAwake(); }}>
               <MiniOrb label="CHAT" size={60} />
