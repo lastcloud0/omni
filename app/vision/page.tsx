@@ -99,15 +99,20 @@ export default function VisionPage() {
 
   const pinching = frame ? frame.pinch < 0.06 : false;
 
-  // 드래그 가능한 컨트롤 박스. 마운트 후 중앙 하단으로 위치.
+  // 드래그 가능한 컨트롤 박스. 실제 크기 측정해 중앙 하단 정렬.
+  const ctrlBoxRef = useRef<HTMLDivElement>(null);
   const { box: ctrl, setBox: setCtrl, dragProps: ctrlDrag } = useDraggable({
-    initial: { x: 0, y: 0, w: 430, h: 56 },
+    initial: { x: -9999, y: -9999, w: 430, h: 56 }, // 측정 전 화면 밖에 숨김
   });
   useEffect(() => {
+    const w = ctrlBoxRef.current?.offsetWidth ?? 430;
+    const h = ctrlBoxRef.current?.offsetHeight ?? 56;
     setCtrl((b) => ({
       ...b,
-      x: Math.max(8, window.innerWidth / 2 - b.w / 2),
-      y: window.innerHeight - b.h - 28,
+      w,
+      h,
+      x: Math.max(8, Math.round(window.innerWidth / 2 - w / 2)),
+      y: window.innerHeight - h - 28,
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -142,6 +147,7 @@ export default function VisionPage() {
 
       {/* 드래그 가능한 글래스 컨트롤 박스 */}
       <div
+        ref={ctrlBoxRef}
         className="glass fixed z-40 flex select-none items-center gap-3 rounded-2xl py-3 pl-2 pr-4 text-xs"
         style={{ left: ctrl.x, top: ctrl.y, touchAction: "none" }}
       >
