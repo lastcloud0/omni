@@ -27,6 +27,24 @@ function isStopWord(text: string): boolean {
   return STOP_WORDS.some((w) => t.includes(w.replace(/\s/g, "")));
 }
 
+// 모드 전환 CTA 감지. AI 없이 즉시 처리.
+function detectCTA(
+  text: string
+): { action: "vision-on" | "vision-off" | "chat-on" | "chat-off"; reply: string } | null {
+  const t = text.replace(/\s/g, "");
+  const ON = "(켜|켜줘|키|킬|활성|온|start|on)";
+  const OFF = "(꺼|꺼줘|끄|끌|종료|비활성|오프|꺼져|stop|off)";
+  if (new RegExp(`비전모드.*${OFF}`).test(t))
+    return { action: "vision-off", reply: "비전 모드를 종료했습니다." };
+  if (new RegExp(`비전모드.*${ON}`).test(t))
+    return { action: "vision-on", reply: "비전 모드가 활성화되었습니다." };
+  if (new RegExp(`(채팅|챗)모드.*${OFF}`).test(t))
+    return { action: "chat-off", reply: "채팅 모드를 종료했습니다." };
+  if (new RegExp(`(채팅|챗)모드.*${ON}`).test(t))
+    return { action: "chat-on", reply: "채팅 모드가 활성화되었습니다." };
+  return null;
+}
+
 function stripWakeWord(text: string): string {
   let out = text;
   for (const w of WAKE_WORDS) {
@@ -43,14 +61,20 @@ function uid() {
  * Top-level OMNI state machine. Owns wake-word detection, the conversation
  * turn (STT -> OpenAI -> TTS), status transitions, and persisted chat log.
  */
+export type CtaAction = "vision-on" | "vision-off" | "chat-on" | "chat-off";
+
 interface OmniOptions {
   /** AI가 응답에 패널을 포함하면 호출됨 → 껍데기가 화면에 출력. */
   onPanel?: (panel: Panel) => void;
+  /** 모드 전환 CTA 감지 시 호출 (페이지가 실제 전환 수행). */
+  onCta?: (action: CtaAction) => void;
 }
 
-export function useOmni({ onPanel }: OmniOptions = {}) {
+export function useOmni({ onPanel, onCta }: OmniOptions = {}) {
   const onPanelRef = useRef(onPanel);
   onPanelRef.current = onPanel;
+  const onCtaRef = useRef(onCta);
+  onCtaRef.current = onCta;
   const [status, setStatus] = useState<OmniStatus>("idle");
   const [awake, setAwake] = useState(false); // wake-word toggle (mic armed)
   const [interacted, setInteracted] = useState(false); // "옴니" 인식으로 활성화됐는지
@@ -121,11 +145,31 @@ export function useOmni({ onPanel }: OmniOptions = {}) {
     setStatus(awake ? "listening" : "idle");
   }, [awake]);
 
+  // 모드 전환 CTA 실행 — AI 없이 즉시 전환 + 상태 안내.
+  const runCTA = useCallback(
+    (cta: { action: CtaAction; reply: string }) => {
+      stopSpeaking();
+      busyRef.current = false;
+      setInteracted(true);
+      onCtaRef.current?.(cta.action);
+      pushMessage({ id: uid(), role: "assistant", content: cta.reply, createdAt: Date.now() });
+      setStatus("responding");
+      speak(cta.reply).then(() => setStatus(awake ? "listening" : "idle"));
+    },
+    [awake, pushMessage]
+  );
+
   const handleFinal = useCallback(
     (text: string) => {
       // "그만"류는 busy 가드보다 먼저 — 말하는 중에도 멈출 수 있게.
       if (isStopWord(text)) {
         interrupt();
+        return;
+      }
+      // 모드 전환 CTA — 웨이크워드 없이도 인식.
+      const cta = detectCTA(text);
+      if (cta) {
+        runCTA(cta);
         return;
       }
       if (busyRef.current) return;
@@ -139,7 +183,7 @@ export function useOmni({ onPanel }: OmniOptions = {}) {
         }
       }
     },
-    [respondTo, interrupt]
+    [respondTo, interrupt, runCTA]
   );
 
   const { supported, listening, interim, start, stop } = useSpeechRecognition({
@@ -181,10 +225,15 @@ export function useOmni({ onPanel }: OmniOptions = {}) {
         interrupt();
         return;
       }
+      const cta = detectCTA(t);
+      if (cta) {
+        runCTA(cta);
+        return;
+      }
       setInteracted(true);
       respondTo(t);
     },
-    [respondTo, interrupt]
+    [respondTo, interrupt, runCTA]
   );
 
   const clearLog = useCallback(() => setMessages([]), []);

@@ -1,13 +1,25 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { useOmni } from "@/hooks/useOmni";
+import { useOmni, type CtaAction } from "@/hooks/useOmni";
 import { useAudioLevel } from "@/hooks/useAudioLevel";
 import { OmniOrb } from "@/components/OmniOrb";
 import { MiniOrb } from "@/components/MiniOrb";
 
 export default function Home() {
+  const router = useRouter();
+  const [chatOpen, setChatOpen] = useState(false); // CHAT 모드(하단 대화 UI)
+
+  // 음성/텍스트 CTA → 모드 전환
+  const handleCta = (action: CtaAction) => {
+    if (action === "vision-on") router.push("/vision");
+    else if (action === "vision-off") router.push("/");
+    else if (action === "chat-on") setChatOpen(true);
+    else if (action === "chat-off") setChatOpen(false);
+  };
+
   const {
     status,
     awake,
@@ -17,13 +29,12 @@ export default function Home() {
     interrupt,
     toggleAwake,
     sendText,
-  } = useOmni();
+  } = useOmni({ onCta: handleCta });
   const speaking = status === "thinking" || status === "responding";
   const micActive = awake && (status === "listening" || status === "responding");
   const { level } = useAudioLevel(micActive);
   const [draft, setDraft] = useState("");
   const [menu, setMenu] = useState(false); // 구체 호버/터치 시 위성 메뉴
-  const [chatOpen, setChatOpen] = useState(false); // CHAT 모드(하단 대화 UI)
   const closeT = useRef<ReturnType<typeof setTimeout> | null>(null);
   const openMenu = () => {
     if (closeT.current) clearTimeout(closeT.current);
