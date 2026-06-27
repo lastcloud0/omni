@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChatMessage, OmniStatus, Panel } from "@/lib/types";
-import { speak } from "@/lib/speak";
+import { speak, stopSpeaking } from "@/lib/speak";
 import { askAI } from "@/lib/aiClient";
 import { validateReply } from "@/lib/validation";
 import { useSpeechRecognition } from "./useSpeechRecognition";
@@ -14,9 +14,17 @@ const WAKE_WORDS = [
 ];
 const STORAGE_KEY = "omni.chatlog.v1";
 
+// 말 멈춤(barge-in) 키워드.
+const STOP_WORDS = ["그만", "그만해", "그만말해", "멈춰", "멈춰줘", "스탑", "stop"];
+
 function hasWakeWord(text: string): boolean {
   const t = text.toLowerCase().replace(/\s/g, "");
   return WAKE_WORDS.some((w) => t.includes(w.replace(/\s/g, "")));
+}
+
+function isStopWord(text: string): boolean {
+  const t = text.toLowerCase().replace(/\s/g, "");
+  return STOP_WORDS.some((w) => t.includes(w.replace(/\s/g, "")));
 }
 
 function stripWakeWord(text: string): string {
@@ -106,8 +114,20 @@ export function useOmni({ onPanel }: OmniOptions = {}) {
     [awake, pushMessage]
   );
 
+  // 말/생성 중단 (barge-in). 코어 클릭·"그만"·새 명령에서 호출.
+  const interrupt = useCallback(() => {
+    stopSpeaking();
+    busyRef.current = false;
+    setStatus(awake ? "listening" : "idle");
+  }, [awake]);
+
   const handleFinal = useCallback(
     (text: string) => {
+      // "그만"류는 busy 가드보다 먼저 — 말하는 중에도 멈출 수 있게.
+      if (isStopWord(text)) {
+        interrupt();
+        return;
+      }
       if (busyRef.current) return;
       if (hasWakeWord(text)) {
         setInteracted(true); // "옴니" 인식 → 활성화
@@ -115,12 +135,11 @@ export function useOmni({ onPanel }: OmniOptions = {}) {
         if (command) {
           respondTo(command);
         } else {
-          // Just the wake word — acknowledge and keep listening.
           setStatus("listening");
         }
       }
     },
-    [respondTo]
+    [respondTo, interrupt]
   );
 
   const { supported, listening, interim, start, stop } = useSpeechRecognition({
@@ -156,12 +175,16 @@ export function useOmni({ onPanel }: OmniOptions = {}) {
   // Manual text command (typed in the console input) — bypasses wake word.
   const sendText = useCallback(
     (text: string) => {
-      if (text.trim()) {
-        setInteracted(true);
-        respondTo(text.trim());
+      const t = text.trim();
+      if (!t) return;
+      if (isStopWord(t)) {
+        interrupt();
+        return;
       }
+      setInteracted(true);
+      respondTo(t);
     },
-    [respondTo]
+    [respondTo, interrupt]
   );
 
   const clearLog = useCallback(() => setMessages([]), []);
@@ -174,6 +197,7 @@ export function useOmni({ onPanel }: OmniOptions = {}) {
     interim,
     supported,
     messages,
+    interrupt,
     toggleAwake,
     sendText,
     clearLog,

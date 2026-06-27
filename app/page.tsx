@@ -14,9 +14,11 @@ export default function Home() {
     interacted,
     interim,
     messages,
+    interrupt,
     toggleAwake,
     sendText,
   } = useOmni();
+  const speaking = status === "thinking" || status === "responding";
   const micActive = awake && (status === "listening" || status === "responding");
   const { level } = useAudioLevel(micActive);
   const [draft, setDraft] = useState("");
@@ -57,7 +59,11 @@ export default function Home() {
           onMouseEnter={openMenu}
           onMouseLeave={closeMenu}
         >
-          <OmniOrb status={status} level={level} onClick={() => setMenu((m) => !m)} />
+          <OmniOrb
+            status={status}
+            level={level}
+            onClick={() => (speaking ? interrupt() : setMenu((m) => !m))}
+          />
 
           {/* 미니 코어 버튼 — 메인코어 중심에서 솟아나와 오른쪽에 나란히.
               (추후 개수 늘면 dx/dy를 원호로 배치해 균형 유지) */}

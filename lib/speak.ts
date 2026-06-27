@@ -1,5 +1,23 @@
 "use client";
 
+// 현재 재생 중인 ElevenLabs 오디오 — 중단(barge-in)용.
+let currentAudio: HTMLAudioElement | null = null;
+
+/** 지금 말하고 있는 걸 즉시 멈춘다 (브라우저 TTS + ElevenLabs 오디오). */
+export function stopSpeaking() {
+  try {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+  } catch {
+    /* ignore */
+  }
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio = null;
+  }
+}
+
 /**
  * Speaks text via ElevenLabs (/api/tts) when a server key is configured,
  * otherwise falls back to the browser's SpeechSynthesis. Resolves when audio
@@ -19,13 +37,17 @@ export async function speak(text: string): Promise<void> {
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
+      currentAudio = audio;
       await new Promise<void>((resolve) => {
-        audio.onended = () => {
+        const done = () => {
           URL.revokeObjectURL(url);
+          if (currentAudio === audio) currentAudio = null;
           resolve();
         };
-        audio.onerror = () => resolve();
-        audio.play().catch(() => resolve());
+        audio.onended = done;
+        audio.onerror = done;
+        audio.onpause = done; // 중단 시에도 resolve
+        audio.play().catch(() => done());
       });
       return;
     }
