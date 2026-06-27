@@ -126,17 +126,15 @@ export default function Home() {
         </div>
       </section>
 
-      {/* CHAT 모드일 때만 하단 대화 UI 표시 */}
-      {/* CHAT 모드 — 하단 오버레이(코어 위치 영향 X). 마이크 버튼 없음 */}
+      {/* CHAT 모드 — 딤 배경 + 하단 오버레이(코어 위치 영향 X) */}
       {chatOpen && (
+        <>
+        {/* 딤 처리 — 코어와 계층 구분, 클릭 시 닫힘 */}
+        <div
+          className="fixed inset-0 z-20 bg-black/55 backdrop-blur-[1px]"
+          onClick={() => setChatOpen(false)}
+        />
         <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col gap-2 px-4 pb-7 sm:px-5">
-          <button
-            onClick={() => setChatOpen(false)}
-            className="absolute right-5 top-[-32px] text-[11px] tracking-widest text-slate-500 transition hover:text-sky-300"
-          >
-            CLOSE ✕
-          </button>
-
           {/* 대화 로그 (최근 몇 개) */}
           <div className="flex flex-col gap-2.5">
             <AnimatePresence initial={false}>
@@ -180,8 +178,17 @@ export default function Home() {
             >
               SEND
             </button>
+            <button
+              type="button"
+              onClick={() => setChatOpen(false)}
+              aria-label="닫기"
+              className="h-12 w-12 shrink-0 rounded-2xl border border-white/15 bg-white/[0.06] text-[15px] text-slate-300 transition hover:border-sky-400/50 hover:text-sky-100"
+            >
+              ✕
+            </button>
           </form>
         </div>
+        </>
       )}
     </main>
   );
