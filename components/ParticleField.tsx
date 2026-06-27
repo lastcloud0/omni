@@ -86,15 +86,67 @@ export function ParticleField({
     let cam = camRef.current;
     let yaw = 0, pitch = 0, raf = 0;
     let lastPinch = 1;
+    // 마우스 조작 상태
+    let mousePtr: { x: number; y: number } | null = null;
+    let hoveredNode: LinkNode | null = null;
+    let dragging = false;
+    let moved = false; // 드래그로 움직였는지(클릭 오작동 방지)
+    let lastMX = 0, lastMY = 0;
+    let lastInteract = 0; // 마지막 마우스/손 조작 시각 → 일정시간 후 자동회전
+
+    // --- 마우스 핸들러 ---
+    const onDown = (e: PointerEvent) => {
+      dragging = true;
+      moved = false;
+      lastMX = e.clientX;
+      lastMY = e.clientY;
+      lastInteract = performance.now();
+    };
+    const onMove = (e: PointerEvent) => {
+      const r = canvas.getBoundingClientRect();
+      mousePtr = { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height };
+      if (dragging) {
+        const dx = e.clientX - lastMX, dy = e.clientY - lastMY;
+        if (Math.abs(dx) + Math.abs(dy) > 3) moved = true;
+        yaw += dx * 0.006;
+        pitch = Math.max(-1.2, Math.min(1.2, pitch + dy * 0.006));
+        lastMX = e.clientX;
+        lastMY = e.clientY;
+        lastInteract = performance.now();
+      }
+    };
+    const onUp = () => { dragging = false; };
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      camRef.current = Math.max(CAM_MIN, Math.min(CAM_MAX, camRef.current + e.deltaY * 0.0015));
+      lastInteract = performance.now();
+    };
+    const onClick = () => {
+      if (moved) { moved = false; return; } // 드래그였으면 클릭 무시
+      if (hoveredNode) onActivateRef.current?.(hoveredNode);
+    };
+    const onLeave = () => { mousePtr = null; dragging = false; };
+    canvas.addEventListener("pointerdown", onDown);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    canvas.addEventListener("wheel", onWheel, { passive: false });
+    canvas.addEventListener("click", onClick);
+    canvas.addEventListener("pointerleave", onLeave);
 
     const draw = () => {
       const target = Math.max(CAM_MIN, Math.min(CAM_MAX, camRef.current));
       cam += (target - cam) * 0.18;
 
-      // 회전 속도 모델: 손 비틀기 각도 → yaw 속도(브레이크 중립). 손 없으면 자동회전.
+      // 회전: 손(속도) > 마우스 드래그(직접) > 자동회전(둘 다 일정시간 없을 때)
       const spin = spinRef?.current ?? null;
-      yaw += spin == null ? 0.0022 : spin;
-      pitch += (0 - pitch) * 0.05; // 항상 수평 유지
+      const idle = performance.now() - lastInteract > 2500;
+      if (spin != null) {
+        yaw += spin; // 손 비틀기
+      } else if (idle) {
+        yaw += 0.0022; // 자동회전
+        pitch += (0 - pitch) * 0.03; // 천천히 수평 복귀
+      }
+      // (마우스 드래그는 onMove에서 yaw/pitch 직접 가산)
 
       ctx.clearRect(0, 0, W, H);
       const cx = W / 2, cy = H / 2;
@@ -138,8 +190,8 @@ export function ParticleField({
       ctx.fillStyle = cg;
       ctx.fillRect(0, 0, W, H);
 
-      // 포인터 화면 좌표
-      const ptr = pointerRef?.current ?? null;
+      // 포인터 화면 좌표 (손 포인터 우선, 없으면 마우스)
+      const ptr = pointerRef?.current ?? mousePtr;
       const ptrX = ptr ? ptr.x * W : -999;
       const ptrY = ptr ? ptr.y * H : -999;
 
@@ -199,6 +251,8 @@ export function ParticleField({
       }
 
       if (hoverRef) hoverRef.current = hovered;
+      hoveredNode = hovered; // 마우스 클릭 선택용
+      canvas.style.cursor = hovered ? "pointer" : dragging ? "grabbing" : "grab";
 
       // 핀치 클릭(하강 에지) + 호버 → 링크 활성화
       const pinch = pinchRef?.current ?? 1;
@@ -214,6 +268,12 @@ export function ParticleField({
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
+      canvas.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      canvas.removeEventListener("wheel", onWheel);
+      canvas.removeEventListener("click", onClick);
+      canvas.removeEventListener("pointerleave", onLeave);
     };
   }, [camRef, spinRef, pointerRef, pinchRef, hoverRef, count]);
 
