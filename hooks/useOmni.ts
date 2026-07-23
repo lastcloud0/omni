@@ -28,12 +28,14 @@ function isStopWord(text: string): boolean {
 }
 
 // 모드 전환 CTA 감지. AI 없이 즉시 처리.
-function detectCTA(
-  text: string
-): { action: "vision-on" | "vision-off" | "chat-on" | "chat-off"; reply: string } | null {
+function detectCTA(text: string): { action: CtaAction; reply: string } | null {
   const t = text.replace(/\s/g, "");
   const ON = "(켜|켜줘|키|킬|활성|온|start|on)";
   const OFF = "(꺼|꺼줘|끄|끌|종료|비활성|오프|꺼져|stop|off)";
+  if (new RegExp(`(맵|지도)모드.*${OFF}`).test(t))
+    return { action: "map-off", reply: "맵 모드를 종료했습니다." };
+  if (new RegExp(`(맵|지도)모드.*${ON}`).test(t))
+    return { action: "map-on", reply: "맵 모드가 활성화되었습니다." };
   if (new RegExp(`비전모드.*${OFF}`).test(t))
     return { action: "vision-off", reply: "비전 모드를 종료했습니다." };
   if (new RegExp(`비전모드.*${ON}`).test(t))
@@ -61,7 +63,13 @@ function uid() {
  * Top-level OMNI state machine. Owns wake-word detection, the conversation
  * turn (STT -> OpenAI -> TTS), status transitions, and persisted chat log.
  */
-export type CtaAction = "vision-on" | "vision-off" | "chat-on" | "chat-off";
+export type CtaAction =
+  | "vision-on"
+  | "vision-off"
+  | "chat-on"
+  | "chat-off"
+  | "map-on"
+  | "map-off";
 
 interface OmniOptions {
   /** AI가 응답에 패널을 포함하면 호출됨 → 껍데기가 화면에 출력. */

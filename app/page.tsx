@@ -16,6 +16,8 @@ export default function Home() {
   const handleCta = (action: CtaAction) => {
     if (action === "vision-on") router.push("/vision");
     else if (action === "vision-off") router.push("/");
+    else if (action === "map-on") router.push("/map");
+    else if (action === "map-off") router.push("/");
     else if (action === "chat-on") setChatOpen(true);
     else if (action === "chat-off") setChatOpen(false);
   };
@@ -76,12 +78,17 @@ export default function Home() {
             onClick={() => (speaking ? interrupt() : setMenu((m) => !m))}
           />
 
-          {/* 미니 코어 버튼 — 메인코어 중심에서 솟아나와 오른쪽에 나란히.
-              (추후 개수 늘면 dx/dy를 원호로 배치해 균형 유지) */}
+          {/* 미니 코어 버튼 — 메인코어 중심에서 솟아나와 오른쪽 원호(r=240)에 등간격 배치.
+              개수가 늘면 ORBIT의 각도만 나눠주면 균형이 유지된다. */}
           {[
-            { label: "VISION", dx: 188, dy: -150, href: "/vision" },
-            { label: "CHAT", dx: 230, dy: 88, onClick: () => { setChatOpen(true); if (!awake) toggleAwake(); } },
-          ].map((b, i) => {
+            { label: "VISION", deg: -50, href: "/vision" },
+            { label: "MAP", deg: 0, href: "/map" },
+            { label: "CHAT", deg: 50, onClick: () => { setChatOpen(true); if (!awake) toggleAwake(); } },
+          ].map((o) => ({
+            ...o,
+            dx: Math.round(240 * Math.cos((o.deg * Math.PI) / 180)),
+            dy: Math.round(240 * Math.sin((o.deg * Math.PI) / 180)),
+          })).map((b, i) => {
             const common = {
               initial: false as const,
               animate: menu
@@ -116,6 +123,9 @@ export default function Home() {
             <button onClick={() => { setChatOpen(true); if (!awake) toggleAwake(); }}>
               <MiniOrb label="CHAT" size={60} />
             </button>
+            <a href="/map">
+              <MiniOrb label="MAP" size={60} />
+            </a>
             <a href="/vision">
               <MiniOrb label="VISION" size={60} />
             </a>

@@ -57,6 +57,66 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
+/* ── MAP: 네온 핀 마커 ─────────────────────────────────────── */
+.omni-pin {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+.omni-pin-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  background: #38bdf8;
+  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.25), 0 0 16px rgba(56, 189, 248, 0.9);
+  animation: omni-pin-pulse 1.8s ease-out infinite;
+}
+.omni-pin-stem {
+  width: 1px;
+  height: 22px;
+  background: linear-gradient(to bottom, rgba(56, 189, 248, 0.9), transparent);
+}
+.omni-pin-label {
+  position: absolute;
+  bottom: 34px;
+  white-space: nowrap;
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  color: #e0f2fe;
+  background: rgba(2, 8, 20, 0.72);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  backdrop-filter: blur(6px);
+}
+@keyframes omni-pin-pulse {
+  0% { box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.35), 0 0 14px rgba(56, 189, 248, 0.8); }
+  70% { box-shadow: 0 0 0 12px rgba(56, 189, 248, 0), 0 0 20px rgba(56, 189, 248, 0.5); }
+  100% { box-shadow: 0 0 0 3px rgba(56, 189, 248, 0), 0 0 14px rgba(56, 189, 248, 0.8); }
+}
+
+/* ── MAP: MapLibre 기본 컨트롤을 다크 글래스로 ──────────────── */
+.maplibregl-ctrl-group {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+}
+.maplibregl-ctrl-group button + button {
+  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+.maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+  filter: invert(1) hue-rotate(180deg) brightness(1.4);
+}
+.maplibregl-ctrl-attrib {
+  background: rgba(2, 6, 16, 0.7) !important;
+  color: #94a3b8;
+}
+.maplibregl-ctrl-attrib a {
+  color: #7dd3fc;
+}
+
 /* Custom thin scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

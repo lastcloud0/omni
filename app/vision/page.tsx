@@ -234,6 +234,14 @@ export default function VisionPage() {
 
           <span className="h-7 w-px bg-white/10" />
 
+          {/* MAP 모드 */}
+          <a
+            href="/map"
+            className="rounded-lg px-2 py-1 tracking-widest text-slate-300 transition hover:text-sky-300"
+          >
+            MAP
+          </a>
+
           {/* OMNI 메인 */}
           <a
             href="/"
