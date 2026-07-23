@@ -80,6 +80,7 @@ export function useOmni({ onPanel, onCta }: OmniOptions = {}) {
   const [interacted, setInteracted] = useState(false); // "옴니" 인식으로 활성화됐는지
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const busyRef = useRef(false);
+  const turnRef = useRef(0); // 대화 턴 ID — 새 입력이 오면 이전 턴 결과를 버린다.
   // respondTo에서 최신 대화 기록을 stale 없이 읽기 위한 거울.
   const messagesRef = useRef<ChatMessage[]>([]);
   messagesRef.current = messages;
@@ -109,7 +110,9 @@ export function useOmni({ onPanel, onCta }: OmniOptions = {}) {
 
   const respondTo = useCallback(
     async (userText: string) => {
-      if (busyRef.current) return;
+      // 새 입력이 오면 하던 말/생성을 즉시 끊고 이번 턴으로 교체.
+      stopSpeaking();
+      const myTurn = ++turnRef.current;
       busyRef.current = true;
       // 직전 대화 기록을 캡처(새 user 메시지 추가 전) → 맥락 유지.
       const history = messagesRef.current.map((m) => ({
@@ -121,6 +124,7 @@ export function useOmni({ onPanel, onCta }: OmniOptions = {}) {
 
       // 두뇌는 어댑터(askAI)에 위임 — 껍데기는 결과만 받아 출력한다.
       const { reply, panel } = await askAI(userText, history);
+      if (turnRef.current !== myTurn) return; // 새 입력으로 무효화됨
       if (panel) onPanelRef.current?.(panel);
 
       // 클라이언트 검증규칙 통과 — 금지답안 차단/교정.
@@ -132,6 +136,7 @@ export function useOmni({ onPanel, onCta }: OmniOptions = {}) {
       pushMessage({ id: uid(), role: "assistant", content: checked.reply, createdAt: Date.now() });
       setStatus("responding");
       await speak(checked.reply);
+      if (turnRef.current !== myTurn) return; // 말하는 중 새 입력이 들어옴
       busyRef.current = false;
       setStatus(awake ? "listening" : "idle");
     },
@@ -140,6 +145,7 @@ export function useOmni({ onPanel, onCta }: OmniOptions = {}) {
 
   // 말/생성 중단 (barge-in). 코어 클릭·"그만"·새 명령에서 호출.
   const interrupt = useCallback(() => {
+    turnRef.current++; // 진행 중인 응답 무효화
     stopSpeaking();
     busyRef.current = false;
     setStatus(awake ? "listening" : "idle");
@@ -172,7 +178,8 @@ export function useOmni({ onPanel, onCta }: OmniOptions = {}) {
         runCTA(cta);
         return;
       }
-      if (busyRef.current) return;
+      // 말하는 중에도 웨이크워드가 있으면 끊고 새 질문 처리(에코 오작동 방지 위해
+      // 웨이크워드 없는 음성은 무시).
       if (hasWakeWord(text)) {
         setInteracted(true); // "옴니" 인식 → 활성화
         const command = stripWakeWord(text);
