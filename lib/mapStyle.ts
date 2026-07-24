@@ -26,6 +26,54 @@ export const MAP_COLORS = {
   labelHalo: "#01050c",
 };
 
+/** POI class/subclass → 한글 분류명. 클릭 카드에 표시. 없으면 원문 노출. */
+export const POI_KIND_KO: Record<string, string> = {
+  restaurant: "음식점", cafe: "카페", fast_food: "패스트푸드", bakery: "베이커리",
+  bar: "바", beer: "펍", pub: "펍",
+  shop: "상점", grocery: "마트", supermarket: "마트", convenience: "편의점",
+  clothing_store: "의류", clothes: "의류", cosmetics: "화장품", butcher: "정육점",
+  alcohol_shop: "주류", electronics: "전자제품", toys: "완구", gift: "선물",
+  hospital: "병원", clinic: "의원", dentist: "치과", pharmacy: "약국", doctors: "의원",
+  bank: "은행", atm: "ATM",
+  bus: "버스정류장", bus_stop: "버스정류장", railway: "지하철", subway: "지하철",
+  station: "역", entrance: "출입구", subway_entrance: "지하철 출구", parking: "주차장",
+  lodging: "숙박", hotel: "호텔", motel: "모텔", hostel: "게스트하우스",
+  office: "사무실", lawyer: "법률", estate_agent: "부동산", government: "관공서",
+  school: "학교", kindergarten: "유치원", college: "대학", library: "도서관",
+  park: "공원", garden: "정원", pitch: "운동장", playground: "놀이터",
+  fuel: "주유소", charging_station: "충전소", police: "경찰서", fire_station: "소방서",
+  post: "우체국", post_office: "우체국", cinema: "영화관", theatre: "극장",
+  museum: "박물관", art_gallery: "미술관", gallery: "미술관", hairdresser: "미용실",
+  place_of_worship: "종교시설", pharmacy_shop: "약국", toilets: "화장실", atm_shop: "ATM",
+};
+
+/** class 또는 subclass로 한글 분류를 찾는다. */
+export function poiKindKo(cls?: string, subclass?: string): string {
+  return (
+    (cls && POI_KIND_KO[cls]) ||
+    (subclass && POI_KIND_KO[subclass]) ||
+    subclass ||
+    cls ||
+    "장소"
+  );
+}
+
+/**
+ * POI 업종(class) → 색 계열. 지도 위 점/라벨 색으로 쓴다.
+ * 클릭 카드의 한글 분류와 짝을 맞춰 둔다(POI_KIND_KO 참고).
+ */
+export const POI_COLOR: import("maplibre-gl").ExpressionSpecification = [
+  "match",
+  ["get", "class"],
+  ["restaurant", "cafe", "fast_food", "bakery", "bar", "beer"], "#ffb454", // 음식·카페 — 앰버
+  ["shop", "grocery", "clothing_store", "alcohol_shop", "butcher"], "#ff77c8", // 상점 — 핑크
+  ["hospital", "dentist", "pharmacy", "doctors"], "#4ade80", // 의료 — 그린
+  ["bank", "atm"], "#facc15", // 금융 — 옐로
+  ["bus", "railway", "entrance", "parking"], "#7dd3fc", // 교통 — 스카이
+  ["lodging"], "#c084fc", // 숙박 — 퍼플
+  "#9fb8c8", // 기타 — 뉴트럴
+];
+
 /**
  * 지구본에서 도시 3D까지 하나로 이어지는 다크 네온 스타일.
  * 라벨 한글은 MapLibre의 localIdeographFontFamily가 로컬 폰트로 그린다.
@@ -193,6 +241,71 @@ export function omniMapStyle(): StyleSpecification {
           "text-color": MAP_COLORS.label,
           "text-halo-color": MAP_COLORS.labelHalo,
           "text-halo-width": 1.4,
+        },
+      },
+
+      // ── 도로명 (선을 따라 흐르는 라벨) ────────────────────────
+      {
+        id: "road-label",
+        type: "symbol",
+        source: "openmaptiles",
+        "source-layer": "transportation_name",
+        minzoom: 13,
+        layout: {
+          "symbol-placement": "line",
+          "text-field": ["coalesce", ["get", "name:ko"], ["get", "name"]],
+          "text-font": ["Noto Sans Regular"],
+          "text-size": ["interpolate", ["linear"], ["zoom"], 13, 10, 18, 13],
+          "text-max-angle": 30,
+          "symbol-spacing": 260,
+        },
+        paint: {
+          "text-color": "#8fb6cf",
+          "text-halo-color": MAP_COLORS.labelHalo,
+          "text-halo-width": 1.4,
+        },
+      },
+
+      // ── POI 점 (업종색 원) ────────────────────────────────────
+      {
+        id: "poi-dot",
+        type: "circle",
+        source: "openmaptiles",
+        "source-layer": "poi",
+        minzoom: 15,
+        // rank가 낮을수록(=중요) 먼저 보이게. 줌이 올라갈수록 덜 중요한 것까지.
+        filter: ["<=", ["coalesce", ["get", "rank"], 99], ["interpolate", ["linear"], ["zoom"], 15, 5, 17, 30, 19, 999]],
+        paint: {
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 15, 2.5, 18, 4.5],
+          "circle-color": POI_COLOR,
+          "circle-opacity": 0.9,
+          "circle-stroke-width": 1,
+          "circle-stroke-color": "#02040a",
+          "circle-stroke-opacity": 0.7,
+        },
+      },
+
+      // ── POI 라벨 (점 옆 이름) ─────────────────────────────────
+      {
+        id: "poi-label",
+        type: "symbol",
+        source: "openmaptiles",
+        "source-layer": "poi",
+        minzoom: 16,
+        filter: ["<=", ["coalesce", ["get", "rank"], 99], ["interpolate", ["linear"], ["zoom"], 16, 6, 18, 30, 19, 999]],
+        layout: {
+          "text-field": ["coalesce", ["get", "name:ko"], ["get", "name"]],
+          "text-font": ["Noto Sans Regular"],
+          "text-size": ["interpolate", ["linear"], ["zoom"], 16, 10, 19, 13],
+          "text-anchor": "left",
+          "text-offset": [0.7, 0],
+          "text-max-width": 7,
+          "text-optional": true,
+        },
+        paint: {
+          "text-color": "#dbeafe",
+          "text-halo-color": MAP_COLORS.labelHalo,
+          "text-halo-width": 1.3,
         },
       },
     ],

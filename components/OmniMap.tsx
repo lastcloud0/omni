@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import maplibregl, { type Map as MLMap, type Marker } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { omniMapStyle } from "@/lib/mapStyle";
+import { omniMapStyle, poiKindKo } from "@/lib/mapStyle";
 import { searchPlaces, zoomForKind, type GeoResult } from "@/lib/geocode";
 
 /** 처음 보이는 지구본 시점 (한반도가 정면). */
@@ -13,6 +13,17 @@ const BUILDING_ZOOM = 15;
 const TILT = 60;
 
 interface Pin extends GeoResult {}
+
+/** 클릭한 POI 정보 카드. */
+interface PoiCard {
+  name: string;
+  kind: string;
+  lon: number;
+  lat: number;
+  /** 화면상 클릭 지점(px) — 카드를 그 근처에 띄운다. */
+  x: number;
+  y: number;
+}
 
 export function OmniMap() {
   const holder = useRef<HTMLDivElement>(null);
@@ -29,6 +40,7 @@ export function OmniMap() {
   const [results, setResults] = useState<GeoResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [openList, setOpenList] = useState(false);
+  const [card, setCard] = useState<PoiCard | null>(null);
 
   // ── 지도 생성 ────────────────────────────────────────────────
   useEffect(() => {
@@ -59,6 +71,12 @@ export function OmniMap() {
     map.on("move", () => {
       setZoom(map.getZoom());
       setPitch(map.getPitch());
+      // 카드가 열려 있으면 POI 좌표를 다시 화면좌표로 투영해 붙어다니게 한다.
+      setCard((c) => {
+        if (!c) return c;
+        const pt = map.project([c.lon, c.lat]);
+        return { ...c, x: pt.x, y: pt.y };
+      });
     });
 
     // 건물 레벨까지 줌인하면 한 번만 자동으로 기울여 3D를 보여준다.
@@ -71,6 +89,39 @@ export function OmniMap() {
     });
 
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "bottom-right");
+
+    // ── POI 상호작용: 점 위에서 커서 변경 + 클릭 시 정보카드 ──────
+    const POI_LAYERS = ["poi-dot", "poi-label"];
+    const onEnter = () => (map.getCanvas().style.cursor = "pointer");
+    const onLeave = () => (map.getCanvas().style.cursor = "");
+    const onPoiClick = (e: maplibregl.MapLayerMouseEvent) => {
+      const f = e.features?.[0];
+      if (!f) return;
+      const p = f.properties || {};
+      const name = (p["name:ko"] as string) || (p.name as string) || "이름 없음";
+      // 점(Point)의 좌표를 카드 위치의 근거로 쓴다.
+      const geo = f.geometry;
+      const [lon, lat] =
+        geo.type === "Point" ? (geo.coordinates as [number, number]) : [e.lngLat.lng, e.lngLat.lat];
+      setCard({
+        name,
+        kind: poiKindKo(p.class as string, p.subclass as string),
+        lon,
+        lat,
+        x: e.point.x,
+        y: e.point.y,
+      });
+    };
+    for (const id of POI_LAYERS) {
+      map.on("mouseenter", id, onEnter);
+      map.on("mouseleave", id, onLeave);
+      map.on("click", id, onPoiClick);
+    }
+    // 빈 곳(POI 아님) 클릭 시 카드 닫기.
+    map.on("click", (e) => {
+      const hits = map.queryRenderedFeatures(e.point, { layers: POI_LAYERS });
+      if (!hits.length) setCard(null);
+    });
 
     return () => {
       markersRef.current.forEach((m) => m.remove());
@@ -172,6 +223,51 @@ export function OmniMap() {
       {/* 인라인 스타일 필수: maplibre-gl.css의 .maplibregl-map{position:relative}가
           Tailwind .absolute를 덮어써서(같은 특이도, 나중 로드) 높이가 0이 된다. */}
       <div ref={holder} style={{ position: "absolute", inset: 0 }} />
+
+      {/* POI 클릭 정보카드 — 홀로그램 글래스. 클릭 지점 위에 뜬다. */}
+      {card && (
+        <div
+          className="glass pointer-events-auto absolute z-40 w-[200px] -translate-x-1/2 rounded-xl px-3.5 py-3"
+          style={{
+            left: Math.max(104, Math.min(card.x, (typeof window !== "undefined" ? window.innerWidth : 1280) - 104)),
+            top: Math.max(12, card.y - 16),
+            transform: "translate(-50%, -100%)",
+          }}
+        >
+          <button
+            onClick={() => setCard(null)}
+            aria-label="닫기"
+            className="absolute right-2 top-1.5 text-slate-400 transition hover:text-sky-300"
+          >
+            ✕
+          </button>
+          <div className="mb-1 text-[10px] tracking-wider text-sky-300/80">{card.kind}</div>
+          <div className="mb-2 pr-4 text-[15px] font-medium leading-snug text-sky-50">
+            {card.name}
+          </div>
+          <div className="font-mono text-[10px] text-slate-400">
+            {card.lat.toFixed(5)}, {card.lon.toFixed(5)}
+          </div>
+          <div className="mt-2 flex gap-2">
+            <a
+              href={`https://map.kakao.com/link/map/${encodeURIComponent(card.name)},${card.lat},${card.lon}`}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-md border border-sky-400/30 px-2 py-1 text-[11px] text-sky-200 transition hover:border-sky-400/70 hover:bg-sky-400/10"
+            >
+              카카오맵
+            </a>
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${card.lat},${card.lon}`}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-md border border-white/15 px-2 py-1 text-[11px] text-slate-300 transition hover:border-sky-400/50 hover:text-sky-100"
+            >
+              길찾기
+            </a>
+          </div>
+        </div>
+      )}
 
       {/* 로딩 중 오버레이 — 타일 받아오는 사이 검은 화면만 보이지 않게 */}
       {!ready && (
