@@ -8,7 +8,52 @@
  * ★ 나중에 "실사 3D 건물"로 갈아탈 경우: 이 파일만 교체하면 된다.
  *   (Cesium + Google Photorealistic 3D Tiles = 실사이지만 카드등록 필요)
  */
-import type { StyleSpecification } from "maplibre-gl";
+import type {
+  StyleSpecification,
+  FilterSpecification,
+  ExpressionSpecification,
+} from "maplibre-gl";
+
+// ── POI 표시 필터 (rank 기반 밀도 조절) ─────────────────────────
+// 상수로 빼둔다: 카테고리 필터를 켰다 껐다 할 때 이 기본값으로 되돌린다.
+export const POI_RANK_FILTER_DOT: FilterSpecification = [
+  "<=",
+  ["coalesce", ["get", "rank"], 99],
+  ["interpolate", ["linear"], ["zoom"], 15, 5, 17, 30, 19, 999],
+];
+export const POI_RANK_FILTER_LABEL: FilterSpecification = [
+  "<=",
+  ["coalesce", ["get", "rank"], 99],
+  ["interpolate", ["linear"], ["zoom"], 16, 6, 18, 30, 19, 999],
+];
+
+/** 업종 토큰(class 또는 subclass) 목록에 해당하는 POI만 통과시키는 필터. */
+export function poiCategoryFilter(tokens: string[]): FilterSpecification {
+  return [
+    "any",
+    ["in", ["get", "class"], ["literal", tokens]],
+    ["in", ["get", "subclass"], ["literal", tokens]],
+  ] as unknown as FilterSpecification;
+}
+
+/** 화면/음성에서 쓰는 업종 카테고리. tokens = class 또는 subclass 매칭값. */
+export interface PoiCategory {
+  key: string; // 한글 표시
+  emoji: string;
+  tokens: string[];
+}
+export const POI_CATEGORIES: PoiCategory[] = [
+  { key: "카페", emoji: "☕", tokens: ["cafe"] },
+  { key: "음식점", emoji: "🍽", tokens: ["restaurant", "fast_food", "bakery"] },
+  { key: "편의점", emoji: "🏪", tokens: ["convenience"] },
+  { key: "병원", emoji: "🏥", tokens: ["hospital", "clinic", "dentist", "doctors"] },
+  { key: "약국", emoji: "💊", tokens: ["pharmacy"] },
+  { key: "은행", emoji: "🏦", tokens: ["bank", "atm"] },
+  { key: "주유소", emoji: "⛽", tokens: ["fuel", "charging_station"] },
+  { key: "주차장", emoji: "🅿️", tokens: ["parking"] },
+  { key: "지하철", emoji: "🚇", tokens: ["railway", "subway", "subway_entrance"] },
+  { key: "숙박", emoji: "🏨", tokens: ["lodging", "hotel", "motel", "hostel"] },
+];
 
 const OFM = "https://tiles.openfreemap.org";
 
@@ -274,7 +319,8 @@ export function omniMapStyle(): StyleSpecification {
         "source-layer": "poi",
         minzoom: 15,
         // rank가 낮을수록(=중요) 먼저 보이게. 줌이 올라갈수록 덜 중요한 것까지.
-        filter: ["<=", ["coalesce", ["get", "rank"], 99], ["interpolate", ["linear"], ["zoom"], 15, 5, 17, 30, 19, 999]],
+        // (카테고리 필터 시 OmniMap이 이 필터를 갈아끼운다.)
+        filter: POI_RANK_FILTER_DOT,
         paint: {
           "circle-radius": ["interpolate", ["linear"], ["zoom"], 15, 2.5, 18, 4.5],
           "circle-color": POI_COLOR,
@@ -292,7 +338,7 @@ export function omniMapStyle(): StyleSpecification {
         source: "openmaptiles",
         "source-layer": "poi",
         minzoom: 16,
-        filter: ["<=", ["coalesce", ["get", "rank"], 99], ["interpolate", ["linear"], ["zoom"], 16, 6, 18, 30, 19, 999]],
+        filter: POI_RANK_FILTER_LABEL,
         layout: {
           "text-field": ["coalesce", ["get", "name:ko"], ["get", "name"]],
           "text-font": ["Noto Sans Regular"],
