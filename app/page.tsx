@@ -85,8 +85,8 @@ export default function Home() {
           <button
             onClick={() => (speaking ? interrupt() : setMenu((m) => !m))}
             aria-label="OMNI"
-            className="relative h-[300px] w-[300px] max-w-[80vmin]"
-            style={{ maxHeight: "80vmin" }}
+            className="relative h-[420px] w-[420px] max-w-[92vmin]"
+            style={{ maxHeight: "92vmin" }}
           >
             <GradientOrb
               audioRef={levelRef}
