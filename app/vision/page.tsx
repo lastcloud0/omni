@@ -6,19 +6,8 @@ import { ParticleField } from "@/components/ParticleField";
 import { useDraggable } from "@/hooks/useDraggable";
 import type { HandFrame } from "@/hooks/useHandTracking";
 import type { LinkNode } from "@/lib/linkNodes";
-
-// 줌 제어 (직관적: 핀치 변화량 = 줌, 반응 빠름)
-const ZOOM_GAIN = 14;
-// 회전/줌 동시동작 방지 — 더 강한 동작만 (정규화 기준값)
-const ROT_NORM = 0.6; // 이 정도 비틀면 회전 강도 ~1 (약 50°)
-const ZOOM_VEL_DEAD = 0.004; // 핀치 지터 무시
-const ZOOM_VEL_NORM = 0.012; // 이 속도로 핀치 변하면 줌 강도 ~1
-const MODE_HYST = 1.15; // 모드 전환 히스테리시스(깜빡임 방지)
-// 손 비틀기 회전 제어
-const SPIN_DEAD = 0.28; // 브레이크 중립 구간(라디안, ±약 16°)
-const SPIN_GAIN = 0.06; // 기울인 각도 → 회전 속도 비례
-const SPIN_MAX = 0.09; // 최대 회전 속도(라디안/프레임)
-const ROLL_NEUTRAL = -Math.PI / 2; // 손 똑바로(손가락 위) = 중립
+// 제스처 판정은 MAP과 공용 모듈을 쓴다 (감도 단일 출처).
+import { createGestureReader } from "@/lib/handGesture";
 
 export default function VisionPage() {
   const [active, setActive] = useState(false);
@@ -26,8 +15,7 @@ export default function VisionPage() {
 
   // 카메라 거리(=줌). 작아질수록 줌인. ParticleField가 ref로 읽음.
   const camRef = useRef(3.0);
-  const lastPinch = useRef<number | null>(null);
-  const modeRef = useRef<"rot" | "zoom" | null>(null); // 현재 활성 동작
+  const gesture = useRef(createGestureReader());
   // 손 비틀기 → yaw 회전 "속도". null이면 자동회전.
   const spinRef = useRef<number | null>(null);
   // 노드 상호작용용
@@ -41,59 +29,16 @@ export default function VisionPage() {
 
   const onFrame = (f: HandFrame) => {
     setFrame(f);
-    if (f.detected) {
-      pinchRef.current = f.pinch;
+    // 노드 위에 손이 있으면 선택 우선 — 회전·줌 억제.
+    const g = gesture.current.read(f, { suppress: hoverRef.current != null });
 
-      // 포인터(셀렉용): 손 위치, 거울모드
-      const pt = f.pointer ?? f.landmarks[9] ?? null;
-      if (pt) pointerRef.current = { x: 1 - pt.x, y: pt.y };
+    pinchRef.current = g.pinch;
+    pointerRef.current = g.pointer;
+    spinRef.current = g.spin; // 손 없으면 null → 자동회전
 
-      // --- 회전 의도: 손 비틀기 각도(손목0→중지뿌리9) ---
-      const w = f.landmarks[0];
-      const m = f.landmarks[9];
-      let spinTarget = 0;
-      let rotStrength = 0;
-      if (w && m) {
-        const ang = Math.atan2(m.y - w.y, m.x - w.x);
-        let off = ang - ROLL_NEUTRAL;
-        off = Math.atan2(Math.sin(off), Math.cos(off));
-        off = -off; // 거울모드 보정
-        if (Math.abs(off) > SPIN_DEAD) {
-          const eff = off - Math.sign(off) * SPIN_DEAD;
-          spinTarget = Math.max(-SPIN_MAX, Math.min(SPIN_MAX, eff * SPIN_GAIN));
-          rotStrength = (Math.abs(off) - SPIN_DEAD) / ROT_NORM;
-        }
-      }
-
-      // --- 줌 의도: 핀치 "변화 속도"(가만히 비틀 땐 0 → 회전이 이김) ---
-      const delta = lastPinch.current != null ? f.pinch - lastPinch.current : 0;
-      const zoomStrength = Math.max(0, Math.abs(delta) - ZOOM_VEL_DEAD) / ZOOM_VEL_NORM;
-
-      // --- 더 강한 동작만 채택 (히스테리시스로 깜빡임 방지) ---
-      const overNode = hoverRef.current != null;
-      if (overNode) {
-        modeRef.current = null; // 노드 위 → 선택 우선, 회전·줌 정지
-      } else if (rotStrength > zoomStrength * MODE_HYST) {
-        modeRef.current = "rot";
-      } else if (zoomStrength > rotStrength * MODE_HYST) {
-        modeRef.current = "zoom";
-      } // 둘 다 비슷하면 직전 모드 유지
-
-      // 회전 적용
-      spinRef.current = modeRef.current === "rot" ? spinTarget : 0;
-
-      // 줌 적용 (직관적: 핀치 변화량)
-      if (modeRef.current === "zoom") {
-        camRef.current += delta * ZOOM_GAIN; // 음수=오므림 → 줌인
-        camRef.current = Math.max(0.5, Math.min(3.4, camRef.current));
-      }
-      lastPinch.current = f.pinch;
-    } else {
-      spinRef.current = null; // 손 없으면 자동회전
-      pointerRef.current = null;
-      pinchRef.current = 1;
-      lastPinch.current = null;
-      modeRef.current = null;
+    if (g.zoomDelta !== 0) {
+      camRef.current += g.zoomDelta; // 음수=오므림 → 줌인
+      camRef.current = Math.max(0.5, Math.min(3.4, camRef.current));
     }
   };
 

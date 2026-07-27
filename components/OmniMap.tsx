@@ -14,6 +14,9 @@ import {
 import { searchPlaces, zoomForKind, type GeoResult } from "@/lib/geocode";
 import { parseMapCommand } from "@/lib/mapIntent";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
+import { HandTracker } from "@/components/HandTracker";
+import { createGestureReader } from "@/lib/handGesture";
+import type { HandFrame } from "@/hooks/useHandTracking";
 import {
   fetchRoute,
   formatRoute,
@@ -28,6 +31,14 @@ const HOME = { center: [127.5, 36.5] as [number, number], zoom: 1.6, pitch: 0, b
 /** 3D 건물이 보이기 시작하는 줌 — 이 위로 올라가면 자동으로 기울인다. */
 const BUILDING_ZOOM = 15;
 const TILT = 60;
+
+// ── 핸드 컨트롤 → 지도 카메라 변환 ─────────────────────────────
+// 제스처 판정(데드존·히스테리시스·강도)은 VISION과 100% 동일한 공용 모듈을 쓴다.
+// 여기 두 상수는 "단위 변환"일 뿐 — VISION은 카메라 거리, MAP은 bearing(도)/zoom(레벨).
+const HAND_BEARING_DEG = 180 / Math.PI; // 회전: rad/프레임 → 도/프레임 (동일 각속도)
+const HAND_ZOOM_PER_UNIT = 1.2; // 줌: VISION 카메라거리 1단위 ≈ 지도 줌 1.2레벨
+const MAP_ZOOM_MIN = 2;
+const MAP_ZOOM_MAX = 19;
 
 interface Pin extends GeoResult {}
 
@@ -72,6 +83,9 @@ export function OmniMap() {
   const [category, setCategory] = useState<string | null>(null); // 활성 업종 필터
   const [micOn, setMicOn] = useState(false); // 음성 명령 수신
   const [voiceHint, setVoiceHint] = useState(""); // 최근 인식/처리 안내
+  const [camOn, setCamOn] = useState(false); // 핸드 컨트롤(웹캠)
+  const [handFrame, setHandFrame] = useState<HandFrame | null>(null);
+  const gesture = useRef(createGestureReader());
   const [sound, setSound] = useState(false); // OMNI 음성 요약 on/off
   const soundRef = useRef(false);
   soundRef.current = sound;
@@ -413,6 +427,25 @@ export function OmniMap() {
       speak(speakableSummary(r, mode, destName));
     }
   };
+
+  // ── 핸드 컨트롤: 비틀기=회전(bearing), 핀치=줌 ────────────────
+  // 판정은 VISION과 같은 리더를 쓰고, 여기서는 지도 단위로만 환산한다.
+  const onHandFrame = useCallback((f: HandFrame) => {
+    setHandFrame(f);
+    const map = mapRef.current;
+    if (!map) return;
+    const g = gesture.current.read(f);
+    if (!g.detected) return;
+
+    if (g.spin) {
+      map.setBearing(map.getBearing() + g.spin * HAND_BEARING_DEG);
+    }
+    if (g.zoomDelta !== 0) {
+      // 오므림(음수) = 줌인 → 지도 줌 레벨은 증가
+      const next = map.getZoom() - g.zoomDelta * HAND_ZOOM_PER_UNIT;
+      map.setZoom(Math.max(MAP_ZOOM_MIN, Math.min(MAP_ZOOM_MAX, next)));
+    }
+  }, []);
 
   // ── 업종 필터 ────────────────────────────────────────────────
   const applyCategory = useCallback((key: string | null) => {
@@ -857,12 +890,40 @@ export function OmniMap() {
           </button>
         )}
 
+        <button
+          onClick={() => setCamOn((v) => !v)}
+          title="손 제스처: 손목 비틀기=회전, 핀치=줌 (VISION과 동일 감도)"
+          className={`rounded-lg px-2 py-1 tracking-wider transition ${
+            camOn ? "text-emerald-300" : "text-slate-300 hover:text-sky-300"
+          }`}
+        >
+          {camOn ? "✋ 핸드ON" : "✋ 핸드"}
+        </button>
+
         <span className="h-7 w-px bg-white/10" />
 
         <a href="/" className="rounded-lg px-2 py-1 tracking-widest text-slate-300 transition hover:text-sky-300">
           OMNI
         </a>
       </div>
+
+      {/* 손 포인터 오버레이 (VISION과 동일 룩) */}
+      {camOn && handFrame?.detected && handFrame.pointer && (
+        <div
+          className="pointer-events-none absolute z-40 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 transition-colors"
+          style={{
+            left: `${(1 - handFrame.pointer.x) * 100}%`,
+            top: `${handFrame.pointer.y * 100}%`,
+            borderColor: handFrame.pinch < 0.06 ? "#34d399" : "rgba(56,189,248,0.7)",
+            boxShadow: `0 0 24px ${
+              handFrame.pinch < 0.06 ? "#34d399" : "rgba(56,189,248,0.5)"
+            }`,
+          }}
+        />
+      )}
+
+      {/* 웹캠 손 인식 (드래그 이동·리사이즈 가능한 프리뷰) */}
+      <HandTracker active={camOn} onFrame={onHandFrame} showPreview={camOn} />
     </div>
   );
 }

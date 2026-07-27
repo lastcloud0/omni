@@ -5,8 +5,16 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { useOmni, type CtaAction } from "@/hooks/useOmni";
 import { useAudioLevel } from "@/hooks/useAudioLevel";
-import { OmniOrb } from "@/components/OmniOrb";
+import { GradientOrb } from "@/components/GradientOrb";
 import { MiniOrb } from "@/components/MiniOrb";
+
+// 상태별 오브 색조(hue 회전)
+const STATUS_HUE: Record<string, number> = {
+  idle: 0, // 파랑
+  listening: 25, // 밝은 청록
+  thinking: 90, // 보라
+  responding: 175, // 초록/청록
+};
 
 export default function Home() {
   const router = useRouter();
@@ -35,6 +43,8 @@ export default function Home() {
   const speaking = status === "thinking" || status === "responding";
   const micActive = awake && (status === "listening" || status === "responding");
   const { level } = useAudioLevel(micActive);
+  const levelRef = useRef(0);
+  levelRef.current = level; // 셰이더 오브에 음성 레벨 전달(리렌더 없이)
   const [draft, setDraft] = useState("");
   const [menu, setMenu] = useState(false); // 구체 호버/터치 시 위성 메뉴
   const closeT = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -72,11 +82,17 @@ export default function Home() {
           onMouseEnter={openMenu}
           onMouseLeave={closeMenu}
         >
-          <OmniOrb
-            status={status}
-            level={level}
+          <button
             onClick={() => (speaking ? interrupt() : setMenu((m) => !m))}
-          />
+            aria-label="OMNI"
+            className="relative h-[300px] w-[300px] max-w-[80vmin]"
+            style={{ maxHeight: "80vmin" }}
+          >
+            <GradientOrb
+              audioRef={levelRef}
+              config={{ hue: STATUS_HUE[status] ?? 0, rotationSpeed: speaking ? 0.6 : 0.3 }}
+            />
+          </button>
 
           {/* 미니 코어 버튼 — 메인코어 중심에서 솟아나와 오른쪽 원호(r=240)에 등간격 배치.
               개수가 늘면 ORBIT의 각도만 나눠주면 균형이 유지된다. */}
