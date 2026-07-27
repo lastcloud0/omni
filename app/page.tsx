@@ -94,17 +94,27 @@ export default function Home() {
             />
           </button>
 
-          {/* 미니 코어 버튼 — 메인코어 중심에서 솟아나와 오른쪽 원호(r=240)에 등간격 배치.
-              개수가 늘면 ORBIT의 각도만 나눠주면 균형이 유지된다. */}
-          {[
-            { label: "VISION", deg: -50, href: "/vision" },
-            { label: "MAP", deg: 0, href: "/map" },
-            { label: "CHAT", deg: 50, onClick: () => { setChatOpen(true); if (!awake) toggleAwake(); } },
-          ].map((o) => ({
-            ...o,
-            dx: Math.round(240 * Math.cos((o.deg * Math.PI) / 180)),
-            dy: Math.round(240 * Math.sin((o.deg * Math.PI) / 180)),
-          })).map((b, i) => {
+          {/* 미니 코어 버튼 — 코어 중심 기준 원형 배치, "하단 중앙부터" 대칭으로 채운다.
+              (0°=오른쪽, 90°=아래) 바닥 90°를 중심으로 GAP 간격. 개수가 늘어도
+              start를 다시 계산하므로 항상 바닥 중앙 정렬을 유지한다. */}
+          {(() => {
+            const items = [
+              { label: "VISION", href: "/vision" },
+              { label: "MAP", href: "/map" },
+              { label: "CHAT", onClick: () => { setChatOpen(true); if (!awake) toggleAwake(); } },
+            ];
+            const R = 240;
+            const GAP = 46; // 아이콘 간 각도
+            const start = 90 - ((items.length - 1) * GAP) / 2; // 바닥 중앙 대칭
+            return items.map((o, idx) => {
+              const deg = start + idx * GAP;
+              return {
+                ...o,
+                dx: Math.round(R * Math.cos((deg * Math.PI) / 180)),
+                dy: Math.round(R * Math.sin((deg * Math.PI) / 180)),
+              };
+            });
+          })().map((b, i) => {
             const common = {
               initial: false as const,
               animate: menu
@@ -120,11 +130,11 @@ export default function Home() {
             };
             return b.href ? (
               <motion.a key={b.label} href={b.href} {...common}>
-                <MiniOrb label={b.label} size={64} />
+                <MiniOrb label={b.label} size={64} hue={STATUS_HUE[status] ?? 0} />
               </motion.a>
             ) : (
               <motion.button key={b.label} onClick={b.onClick} {...common}>
-                <MiniOrb label={b.label} size={64} />
+                <MiniOrb label={b.label} size={64} hue={STATUS_HUE[status] ?? 0} />
               </motion.button>
             );
           })}
@@ -137,13 +147,13 @@ export default function Home() {
             style={{ transform: "translate(-50%, 160px)" }}
           >
             <button onClick={() => { setChatOpen(true); if (!awake) toggleAwake(); }}>
-              <MiniOrb label="CHAT" size={60} />
+              <MiniOrb label="CHAT" size={60} hue={STATUS_HUE[status] ?? 0} />
             </button>
             <a href="/map">
-              <MiniOrb label="MAP" size={60} />
+              <MiniOrb label="MAP" size={60} hue={STATUS_HUE[status] ?? 0} />
             </a>
             <a href="/vision">
-              <MiniOrb label="VISION" size={60} />
+              <MiniOrb label="VISION" size={60} hue={STATUS_HUE[status] ?? 0} />
             </a>
           </div>
 
