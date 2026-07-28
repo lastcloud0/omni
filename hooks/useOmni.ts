@@ -5,6 +5,7 @@ import type { ChatMessage, OmniStatus, Panel } from "@/lib/types";
 import { speak, stopSpeaking } from "@/lib/speak";
 import { askAI } from "@/lib/aiClient";
 import { validateReply } from "@/lib/validation";
+import { parseMapNav, type MapIntent } from "@/lib/mapIntent";
 import { useSpeechRecognition } from "./useSpeechRecognition";
 
 // "옴니"는 음성인식에서 없니/엄니/온니 등으로 자주 오인식됨 → 변형 폭넓게 허용.
@@ -76,11 +77,15 @@ interface OmniOptions {
   onPanel?: (panel: Panel) => void;
   /** 모드 전환 CTA 감지 시 호출 (페이지가 실제 전환 수행). */
   onCta?: (action: CtaAction) => void;
+  /** 지도 명령(맵에서 검색/경로) 감지 시 호출 → 페이지가 /map으로 이동. */
+  onMapNav?: (intent: MapIntent) => void;
 }
 
-export function useOmni({ onPanel, onCta }: OmniOptions = {}) {
+export function useOmni({ onPanel, onCta, onMapNav }: OmniOptions = {}) {
   const onPanelRef = useRef(onPanel);
   onPanelRef.current = onPanel;
+  const onMapNavRef = useRef(onMapNav);
+  onMapNavRef.current = onMapNav;
   const onCtaRef = useRef(onCta);
   onCtaRef.current = onCta;
   const [status, setStatus] = useState<OmniStatus>("idle");
@@ -192,6 +197,12 @@ export function useOmni({ onPanel, onCta }: OmniOptions = {}) {
         setInteracted(true); // "옴니" 인식 → 활성화
         const command = stripWakeWord(text);
         if (command) {
+          // 지도 명령("맵에서 ○○ 찾아줘", "A에서 B 경로")이면 AI 대신 지도로.
+          const nav = parseMapNav(command);
+          if (nav) {
+            onMapNavRef.current?.(nav);
+            return;
+          }
           respondTo(command);
         } else {
           setStatus("listening");
@@ -243,6 +254,12 @@ export function useOmni({ onPanel, onCta }: OmniOptions = {}) {
       const cta = detectCTA(t);
       if (cta) {
         runCTA(cta);
+        return;
+      }
+      const nav = parseMapNav(t);
+      if (nav) {
+        setInteracted(true);
+        onMapNavRef.current?.(nav);
         return;
       }
       setInteracted(true);

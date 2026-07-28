@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { LINK_NODES, loadIcon, type LinkNode } from "@/lib/linkNodes";
+import { DEFAULT_LINKS, loadNodeIcon, type LinkNode } from "@/lib/linkNodes";
 
 interface Props {
   /** 카메라 거리(=줌). 값이 작아질수록 구체 안으로 줌인. 부모가 ref로 제어. */
@@ -16,6 +16,8 @@ interface Props {
   hoverRef?: React.MutableRefObject<LinkNode | null>;
   /** 노드 활성화(링크 열기) 콜백. */
   onActivate?: (node: LinkNode) => void;
+  /** 구체에 띄울 링크들. 바뀌면 원이 다시 배치된다. */
+  nodes?: LinkNode[];
   count?: number;
 }
 
@@ -35,11 +37,14 @@ export function ParticleField({
   pinchRef,
   hoverRef,
   onActivate,
+  nodes: nodeList = DEFAULT_LINKS,
   count = 400,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const onActivateRef = useRef(onActivate);
   onActivateRef.current = onActivate;
+  // 링크 목록이 바뀌면 effect를 재실행하기 위한 키 (id 조합).
+  const nodeKey = nodeList.map((n) => n.id).join("|");
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -58,17 +63,18 @@ export function ParticleField({
     }
 
     // 링크 노드는 적도 부근 링에 배치 → yaw 회전만으로 다 앞으로 가져올 수 있음
-    const nodes = LINK_NODES.map((n, i) => {
-      const th = (i / LINK_NODES.length) * Math.PI * 2;
+    const src = nodeList.length ? nodeList : DEFAULT_LINKS;
+    const nodes = src.map((n, i) => {
+      const th = (i / src.length) * Math.PI * 2;
       const yy = (i % 2 ? 0.18 : -0.18); // 위아래 살짝 엇갈리게
       const rr = Math.sqrt(1 - yy * yy) * 1.06;
       return { node: n, x: Math.cos(th) * rr, y: yy * 1.06, z: Math.sin(th) * rr };
     });
 
-    // 아이콘 비동기 로드
+    // 아이콘 비동기 로드 (브랜드 단색 → 실패 시 파비콘 폴백)
     const icons: Record<string, HTMLImageElement | null> = {};
     nodes.forEach(({ node }) => {
-      loadIcon(node.slug, node.color).then((img) => (icons[node.id] = img));
+      loadNodeIcon(node).then((img) => (icons[node.id] = img));
     });
 
     let W = 0, H = 0, dpr = 1;
@@ -275,7 +281,8 @@ export function ParticleField({
       canvas.removeEventListener("click", onClick);
       canvas.removeEventListener("pointerleave", onLeave);
     };
-  }, [camRef, spinRef, pointerRef, pinchRef, hoverRef, count]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [camRef, spinRef, pointerRef, pinchRef, hoverRef, count, nodeKey]);
 
   return <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" aria-hidden />;
 }

@@ -91,6 +91,7 @@ export function OmniMap() {
   soundRef.current = sound;
   const routeAbort = useRef<AbortController | null>(null);
   const dashAnim = useRef<number | null>(null); // 흐르는 대시 애니메이션 프레임
+  const flyRef = useRef<{ cancel: boolean }>({ cancel: true }); // 경로 카메라 무빙 취소 플래그
 
   // 사운드 토글 복원/저장.
   useEffect(() => {
@@ -274,6 +275,11 @@ export function OmniMap() {
       if (!hits.length) setCard(null);
     });
 
+    // 사용자가 지도를 직접 조작하면 경로 카메라 무빙을 멈춘다.
+    const cancelFly = () => (flyRef.current.cancel = true);
+    map.on("dragstart", cancelFly);
+    map.on("wheel", cancelFly);
+
     return () => {
       if (dashAnim.current) cancelAnimationFrame(dashAnim.current);
       routeAbort.current?.abort();
@@ -374,6 +380,7 @@ export function OmniMap() {
   const clearRoute = () => {
     const map = mapRef.current;
     routeAbort.current?.abort();
+    flyRef.current.cancel = true;
     setRoute(null);
     const empty = { type: "FeatureCollection" as const, features: [] };
     (map?.getSource("omni-route") as maplibregl.GeoJSONSource | undefined)?.setData(empty);
@@ -391,41 +398,105 @@ export function OmniMap() {
       );
     });
 
-  /** POI 카드의 목적지까지 경로를 그린다. 출발지=GPS(없으면 안내). */
-  const drawRouteTo = async (to: [number, number], mode: RouteMode, destName?: string) => {
+  /** 경로 전체를 3D로 담은 뒤, 경로를 따라 카메라가 훑는다 (팔란티어풍). */
+  const flyAlongRoute = (coords: [number, number][]) => {
+    const map = mapRef.current;
+    if (!map || coords.length < 2) return;
+    flyRef.current.cancel = true; // 이전 무빙 취소
+    const token = { cancel: false };
+    flyRef.current = token;
+
+    // 경로를 균등 샘플링.
+    const N = Math.min(9, coords.length);
+    const stride = (coords.length - 1) / (N - 1);
+    const pts = Array.from({ length: N }, (_, i) => coords[Math.round(i * stride)]);
+    const bearingTo = (a: [number, number], b: [number, number]) =>
+      (Math.atan2(b[0] - a[0], b[1] - a[1]) * 180) / Math.PI; // 0=북, 시계방향
+
+    let i = 0;
+    const stepMs = 1500;
+    const next = () => {
+      if (token.cancel || !mapRef.current || i >= pts.length) return;
+      const c = pts[i];
+      const bear = i < pts.length - 1 ? bearingTo(pts[i], pts[i + 1]) : map.getBearing();
+      map.easeTo({
+        center: c,
+        bearing: bear,
+        zoom: i === 0 ? 15.6 : 16.3,
+        pitch: TILT,
+        duration: stepMs,
+        essential: true,
+      });
+      i++;
+      window.setTimeout(next, stepMs);
+    };
+    // 전체 조망(fitBounds) 뒤에 훑기 시작.
+    window.setTimeout(() => {
+      if (!token.cancel) next();
+    }, 2600);
+  };
+
+  /**
+   * 경로 코어 — from → to 를 그리고 조망 + (선택)카메라 무빙 + 음성안내.
+   */
+  const drawRoute = async (
+    from: [number, number],
+    to: [number, number],
+    mode: RouteMode,
+    fromName: string | undefined,
+    toName: string | undefined,
+    follow: boolean
+  ) => {
     const map = mapRef.current;
     if (!map) return;
     routeAbort.current?.abort();
+    flyRef.current.cancel = true;
     stopSpeaking();
     const ac = new AbortController();
     routeAbort.current = ac;
-    setRoute({ mode, label: "", loading: true, destName });
+    setRoute({ mode, label: "", loading: true, destName: toName });
 
+    const r = await fetchRoute(from, to, mode, ac.signal);
+    if (ac.signal.aborted) return;
+    if (!r) {
+      setRoute({ mode, label: "", loading: false, error: "경로를 찾지 못했습니다", destName: toName });
+      return;
+    }
+    setRouteData(r.coordinates, from, to);
+    setRoute({ mode, label: formatRoute(r), loading: false, result: r, destName: toName });
+
+    // 경로 전체를 3D로 담는다.
+    const b = new maplibregl.LngLatBounds(from, from);
+    r.coordinates.forEach((c) => b.extend(c));
+    autoTilted.current = true;
+    map.fitBounds(b, { padding: 90, pitch: TILT, duration: 2400, maxZoom: 16 });
+
+    if (follow) flyAlongRoute(r.coordinates);
+    if (soundRef.current) speak(speakableSummary(r, mode, toName));
+  };
+
+  /** POI 카드의 목적지까지 경로. 출발지=GPS(없으면 안내). 카메라 조망만. */
+  const drawRouteTo = async (to: [number, number], mode: RouteMode, destName?: string) => {
+    routeAbort.current?.abort();
+    const ac = new AbortController();
+    routeAbort.current = ac;
+    setRoute({ mode, label: "", loading: true, destName });
     const from = await getMyLocation();
     if (ac.signal.aborted) return;
     if (!from) {
       setRoute({ mode, label: "", loading: false, error: "위치 권한이 필요합니다", destName });
       return;
     }
-    const r = await fetchRoute(from, to, mode, ac.signal);
-    if (ac.signal.aborted) return;
-    if (!r) {
-      setRoute({ mode, label: "", loading: false, error: "경로를 찾지 못했습니다", destName });
-      return;
-    }
-    setRouteData(r.coordinates, from, to);
-    setRoute({ mode, label: formatRoute(r), loading: false, result: r, destName });
+    drawRoute(from, to, mode, "내 위치", destName, false);
+  };
 
-    // 카메라로 경로 전체를 3D로 담아 보여준다.
-    const b = new maplibregl.LngLatBounds(from, from);
-    r.coordinates.forEach((c) => b.extend(c));
-    autoTilted.current = true;
-    map.fitBounds(b, { padding: 90, pitch: TILT, duration: 2400, maxZoom: 16 });
-
-    // 사운드가 켜져 있으면 OMNI가 요약해서 읽어준다.
-    if (soundRef.current) {
-      speak(speakableSummary(r, mode, destName));
-    }
+  /** 이름 하나를 지오코딩해 좌표로. 실패하면 null. */
+  const geocodeOne = async (
+    name: string,
+    signal?: AbortSignal
+  ): Promise<{ lon: number; lat: number; name: string } | null> => {
+    const r = await searchPlaces(name, signal);
+    return r[0] ? { lon: r[0].lon, lat: r[0].lat, name: r[0].name } : null;
   };
 
   // ── 핸드 컨트롤: 비틀기=회전(bearing), 핀치=줌 ────────────────
@@ -490,11 +561,40 @@ export function OmniMap() {
     []
   );
 
+  /** A→B 경로: 두 지점 지오코딩 후 경로 + 카메라 무빙. */
+  const voiceRouteAB = useCallback(
+    async (fromName: string, toName: string, mode: RouteMode) => {
+      const ac = new AbortController();
+      routeAbort.current = ac;
+      setVoiceHint(`“${fromName}” → “${toName}” 경로 탐색 중…`);
+      setRoute({ mode, label: "", loading: true, destName: toName });
+      const [a, b] = await Promise.all([
+        geocodeOne(fromName, ac.signal),
+        geocodeOne(toName, ac.signal),
+      ]);
+      if (ac.signal.aborted) return;
+      if (!a || !b) {
+        const miss = !a ? fromName : toName;
+        setRoute({ mode, label: "", loading: false, error: `“${miss}” 위치를 찾지 못했습니다`, destName: toName });
+        setVoiceHint(`“${miss}” 검색 결과 없음`);
+        return;
+      }
+      setVoiceHint(`${a.name} → ${b.name}`);
+      drawRoute([a.lon, a.lat], [b.lon, b.lat], mode, a.name, b.name, true);
+    },
+    // 핸들러 최신 클로저 사용
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+
   /** 음성 발화 → 의도 파싱 → 실행. */
   const handleVoice = useCallback(
     (text: string) => {
       const intent = parseMapCommand(text);
       switch (intent.type) {
+        case "routeAB":
+          voiceRouteAB(intent.from, intent.to, intent.mode);
+          break;
         case "route":
           voiceRoute(intent.query, intent.mode);
           break;
@@ -526,7 +626,7 @@ export function OmniMap() {
     },
     // 핸들러들은 최신 클로저 사용
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [voiceRoute, voiceSearch, applyCategory]
+    [voiceRoute, voiceRouteAB, voiceSearch, applyCategory]
   );
 
   const { supported: micSupported, interim: micInterim, start: micStart, stop: micStop } =
@@ -538,8 +638,28 @@ export function OmniMap() {
     else micStop();
   }, [micOn, micStart, micStop]);
 
+  // 메인 화면 음성 명령으로 넘어온 진입 파라미터 실행 (한 번만).
+  //   ?q=…            → 검색+이동
+  //   ?to=…&mode=…    → GPS→목적지 경로
+  //   ?from=…&to=…    → A→B 경로 + 카메라 무빙
+  const didUrlIntent = useRef(false);
+  useEffect(() => {
+    if (!ready || didUrlIntent.current) return;
+    didUrlIntent.current = true;
+    const p = new URLSearchParams(window.location.search);
+    const q = p.get("q");
+    const from = p.get("from");
+    const to = p.get("to");
+    const mode: RouteMode = p.get("mode") === "walking" ? "walking" : "driving";
+    if (from && to) voiceRouteAB(from, to, mode);
+    else if (to) voiceRoute(to, mode);
+    else if (q) voiceSearch(q);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
+
   const goHome = () => {
     autoTilted.current = false;
+    flyRef.current.cancel = true;
     mapRef.current?.flyTo({ ...HOME, duration: 2600, essential: true });
   };
 

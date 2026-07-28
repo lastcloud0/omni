@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { useOmni, type CtaAction } from "@/hooks/useOmni";
+import type { MapIntent } from "@/lib/mapIntent";
 import { useAudioLevel } from "@/hooks/useAudioLevel";
 import { GradientOrb } from "@/components/GradientOrb";
 import { MiniOrb } from "@/components/MiniOrb";
@@ -30,6 +31,27 @@ export default function Home() {
     else if (action === "chat-off") setChatOpen(false);
   };
 
+  // 지도 명령 → /map으로 파라미터 실어 이동 (맵에서 검색·경로 자동 실행)
+  const handleMapNav = (intent: MapIntent) => {
+    const p = new URLSearchParams();
+    if (intent.type === "routeAB") {
+      p.set("from", intent.from);
+      p.set("to", intent.to);
+      p.set("mode", intent.mode);
+    } else if (intent.type === "route") {
+      p.set("to", intent.query);
+      p.set("mode", intent.mode);
+    } else if (intent.type === "search") {
+      p.set("q", intent.query);
+    } else if (intent.type === "filter") {
+      p.set("q", intent.category);
+    } else {
+      router.push("/map");
+      return;
+    }
+    router.push(`/map?${p.toString()}`);
+  };
+
   const {
     status,
     awake,
@@ -39,7 +61,7 @@ export default function Home() {
     interrupt,
     toggleAwake,
     sendText,
-  } = useOmni({ onCta: handleCta });
+  } = useOmni({ onCta: handleCta, onMapNav: handleMapNav });
   const speaking = status === "thinking" || status === "responding";
   const micActive = awake && (status === "listening" || status === "responding");
   const { level } = useAudioLevel(micActive);
@@ -227,7 +249,7 @@ export default function Home() {
             />
             <button
               type="submit"
-              className="h-12 shrink-0 rounded-2xl bg-gradient-to-br from-sky-400 to-indigo-600 px-5 text-[13px] font-medium text-white transition hover:brightness-110 active:scale-95 sm:px-6 sm:text-[14px]"
+              className="glass-btn h-12 shrink-0 rounded-2xl px-5 text-[13px] font-medium sm:px-6 sm:text-[14px]"
             >
               SEND
             </button>

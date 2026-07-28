@@ -57,6 +57,28 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
+/* 글래스모피즘 CTA 버튼 — 시안 틴트 유리. SEND / 추가 등에 사용. */
+.glass-btn {
+  background: rgba(56, 189, 248, 0.14);
+  border: 1px solid rgba(125, 211, 252, 0.38);
+  backdrop-filter: blur(10px) saturate(150%);
+  -webkit-backdrop-filter: blur(10px) saturate(150%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 4px 18px rgba(2, 12, 28, 0.35), 0 0 16px rgba(56, 189, 248, 0.15);
+  color: #eaf6ff;
+  transition: background 160ms ease, border-color 160ms ease, transform 120ms ease,
+    box-shadow 160ms ease;
+}
+.glass-btn:hover {
+  background: rgba(56, 189, 248, 0.24);
+  border-color: rgba(125, 211, 252, 0.7);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 6px 22px rgba(2, 12, 28, 0.4), 0 0 22px rgba(56, 189, 248, 0.3);
+}
+.glass-btn:active {
+  transform: scale(0.96);
+}
+
 /* ── MAP: 네온 핀 마커 ─────────────────────────────────────── */
 .omni-pin {
   position: relative;
