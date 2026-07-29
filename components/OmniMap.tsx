@@ -89,6 +89,7 @@ export function OmniMap() {
   const [handFrame, setHandFrame] = useState<HandFrame | null>(null);
   const gesture = useRef(createGestureReader());
   const [menuOpen, setMenuOpen] = useState(false); // 코어 탭 → 반원 설정 아크
+  const [chatOpen, setChatOpen] = useState(false); // 코어→채팅 아이콘 → 입력창
 
   // 코어 음성반응 — 마이크 켜졌을 때 오디오 레벨로 맥동.
   const { level: audioLevel } = useAudioLevel(micOn);
@@ -902,88 +903,74 @@ export function OmniMap() {
         </div>
       )}
 
-      {/* 상단: 검색 */}
-      <div className="absolute left-1/2 top-5 z-40 w-[min(92vw,520px)] -translate-x-1/2">
-        <form onSubmit={onSubmit} className="glass flex items-center gap-2 rounded-2xl px-3 py-2">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0 text-sky-300/80">
-            <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
-            <path d="m20 20-3.2-3.2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-          </svg>
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onFocus={() => results.length && setOpenList(true)}
-            placeholder="검색하거나 명령하세요 — 예: 강남역에서 코엑스 경로, 근처 카페"
-            className="h-8 min-w-0 flex-1 bg-transparent text-[14px] text-sky-50 placeholder:text-slate-400/70 outline-none"
-          />
-          {query && (
+      {/* 상단 중앙: 로고 (메인과 동일 흰색 워드마크) */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/logo.svg"
+        alt="OMNI"
+        className="pointer-events-none absolute left-1/2 top-6 z-40 h-5 -translate-x-1/2 opacity-90"
+        draggable={false}
+      />
+
+      {/* 검색/명령 입력 — 코어의 채팅 아이콘으로 토글. 열면 유지, ✕로 닫기 */}
+      {chatOpen && (
+        <div className="absolute left-1/2 top-16 z-40 w-[min(92vw,520px)] -translate-x-1/2">
+          <form onSubmit={onSubmit} className="glass flex items-center gap-2 rounded-2xl px-3 py-2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0 text-sky-300/80">
+              <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
+              <path d="m20 20-3.2-3.2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onFocus={() => results.length && setOpenList(true)}
+              placeholder="검색하거나 명령하세요 — 예: 강남역에서 코엑스 경로, 근처 병원"
+              className="h-8 min-w-0 flex-1 bg-transparent text-[14px] text-sky-50 placeholder:text-slate-400/70 outline-none"
+            />
             <button
               type="button"
               onClick={() => {
                 setQuery("");
                 setResults([]);
                 setOpenList(false);
+                setChatOpen(false);
               }}
-              aria-label="검색어 지우기"
+              aria-label="닫기"
               className="shrink-0 text-slate-400 transition hover:text-sky-300"
             >
               ✕
             </button>
-          )}
-        </form>
+          </form>
 
-        {/* 검색 결과 */}
-        {openList && (searching || results.length > 0) && (
-          <ul className="glass mt-2 max-h-[46vh] overflow-y-auto rounded-2xl py-1">
-            {searching && results.length === 0 && (
-              <li className="px-4 py-3 text-[13px] text-slate-400">검색 중…</li>
-            )}
-            {results.map((r) => (
-              <li key={r.id}>
-                <button
-                  onClick={() => goTo(r)}
-                  className="flex w-full flex-col items-start gap-0.5 px-4 py-2.5 text-left transition hover:bg-sky-400/10"
-                >
-                  <span className="text-[14px] text-sky-50">{r.name}</span>
-                  {r.detail && (
-                    <span className="text-[11px] text-slate-400">{r.detail}</span>
-                  )}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        {openList && !searching && query.trim().length >= 2 && results.length === 0 && (
-          <div className="glass mt-2 rounded-2xl px-4 py-3 text-[13px] text-slate-400">
-            결과가 없습니다.
-          </div>
-        )}
-
-        {/* 업종 필터 칩 (가로 스크롤) */}
-        <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {category && (
-            <button
-              onClick={() => applyCategory(null)}
-              className="shrink-0 rounded-full border border-rose-400/40 bg-rose-400/10 px-2.5 py-1 text-[11px] text-rose-200 transition hover:bg-rose-400/20"
-            >
-              ✕ 전체
-            </button>
+          {/* 검색 결과 */}
+          {openList && (searching || results.length > 0) && (
+            <ul className="glass mt-2 max-h-[46vh] overflow-y-auto rounded-2xl py-1">
+              {searching && results.length === 0 && (
+                <li className="px-4 py-3 text-[13px] text-slate-400">검색 중…</li>
+              )}
+              {results.map((r) => (
+                <li key={r.id}>
+                  <button
+                    onClick={() => goTo(r)}
+                    className="flex w-full flex-col items-start gap-0.5 px-4 py-2.5 text-left transition hover:bg-sky-400/10"
+                  >
+                    <span className="text-[14px] text-sky-50">{r.name}</span>
+                    {r.detail && (
+                      <span className="text-[11px] text-slate-400">{r.detail}</span>
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
           )}
-          {POI_CATEGORIES.map((c) => (
-            <button
-              key={c.key}
-              onClick={() => applyCategory(category === c.key ? null : c.key)}
-              className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] transition ${
-                category === c.key
-                  ? "border-sky-400/70 bg-sky-400/20 text-sky-100"
-                  : "border-white/12 bg-white/[0.04] text-slate-300 hover:border-sky-400/50 hover:text-sky-100"
-              }`}
-            >
-              {c.emoji} {c.key}
-            </button>
-          ))}
+          {openList && !searching && query.trim().length >= 2 && results.length === 0 && (
+            <div className="glass mt-2 rounded-2xl px-4 py-3 text-[13px] text-slate-400">
+              결과가 없습니다.
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
       {/* OMNI 자막 — 음성 받아쓰기(마이크) 또는 명령 해석 결과(음성·텍스트 공통) */}
       {((micOn && micInterim) || voiceHint) && (
@@ -1001,6 +988,13 @@ export function OmniMap() {
       {(() => {
         // 설정 아이템 — 코어 위쪽 반원에 등간격.
         const items = [
+          {
+            key: "chat", emoji: "💬", label: "입력", active: chatOpen,
+            onClick: () => {
+              setChatOpen((v) => !v);
+              setMenuOpen(false);
+            },
+          },
           { key: "tilt", emoji: pitch > 10 ? "◨" : "▭", label: "기울이기", active: pitch > 10, onClick: toggleTilt },
           { key: "home", emoji: "🌐", label: "지구본", active: false, onClick: goHome },
           {
@@ -1018,59 +1012,62 @@ export function OmniMap() {
         const start = -168,
           end = -12; // 위쪽 반원 각도 폭
         return (
-          <div className="pointer-events-none absolute bottom-16 left-1/2 z-40 h-0 w-0">
-            {/* 반원 아크 아이템 (앵커(0,0) 기준) */}
-            {items.map((it, i) => {
-              const deg = items.length > 1 ? start + (i * (end - start)) / (items.length - 1) : -90;
-              const dx = Math.round(R * Math.cos((deg * Math.PI) / 180));
-              const dy = Math.round(R * Math.sin((deg * Math.PI) / 180));
-              const common = {
-                title: it.label,
-                className: `absolute left-0 top-0 grid h-12 w-12 place-items-center rounded-full border text-[18px] transition-all duration-300 ${
-                  it.active
-                    ? "border-sky-400/70 bg-sky-400/25 text-sky-100"
-                    : "border-white/15 bg-black/40 text-slate-200 hover:border-sky-400/50"
-                } ${"disabled" in it && it.disabled ? "opacity-30" : ""}`,
-                style: {
-                  transform: menuOpen
-                    ? `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(1)`
-                    : "translate(-50%, -50%) scale(0.3)",
-                  opacity: menuOpen ? 1 : 0,
-                  pointerEvents: (menuOpen ? "auto" : "none") as "auto" | "none",
-                  transitionDelay: `${(menuOpen ? i : items.length - i) * 30}ms`,
-                  backdropFilter: "blur(8px)",
-                } as React.CSSProperties,
-              };
-              return it.href ? (
-                <a key={it.key} href={it.href} {...common}>
-                  {it.emoji}
-                </a>
-              ) : (
-                <button
-                  key={it.key}
-                  onClick={() => {
-                    if (!("disabled" in it && it.disabled)) it.onClick?.();
-                  }}
-                  {...common}
-                >
-                  {it.emoji}
-                </button>
-              );
-            })}
+          // 전체폭 flex로 코어 박스를 확실히 가로 중앙에 둔다 (메인 페이지와 동일 패턴).
+          <div className="pointer-events-none absolute inset-x-0 bottom-16 z-40 flex justify-center">
+            <div className="relative h-[76px] w-[76px]">
+              {/* 반원 아크 아이템 — 코어 박스 중심 기준 */}
+              {items.map((it, i) => {
+                const deg = items.length > 1 ? start + (i * (end - start)) / (items.length - 1) : -90;
+                const dx = Math.round(R * Math.cos((deg * Math.PI) / 180));
+                const dy = Math.round(R * Math.sin((deg * Math.PI) / 180));
+                const common = {
+                  title: it.label,
+                  className: `absolute left-1/2 top-1/2 grid h-12 w-12 place-items-center rounded-full border text-[18px] transition-all duration-300 ${
+                    it.active
+                      ? "border-sky-400/70 bg-sky-400/25 text-sky-100"
+                      : "border-white/15 bg-black/40 text-slate-200 hover:border-sky-400/50"
+                  } ${"disabled" in it && it.disabled ? "opacity-30" : ""}`,
+                  style: {
+                    transform: menuOpen
+                      ? `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(1)`
+                      : "translate(-50%, -50%) scale(0.3)",
+                    opacity: menuOpen ? 1 : 0,
+                    pointerEvents: (menuOpen ? "auto" : "none") as "auto" | "none",
+                    transitionDelay: `${(menuOpen ? i : items.length - i) * 30}ms`,
+                    backdropFilter: "blur(8px)",
+                  } as React.CSSProperties,
+                };
+                return it.href ? (
+                  <a key={it.key} href={it.href} {...common}>
+                    {it.emoji}
+                  </a>
+                ) : (
+                  <button
+                    key={it.key}
+                    onClick={() => {
+                      if (!("disabled" in it && it.disabled)) it.onClick?.();
+                    }}
+                    {...common}
+                  >
+                    {it.emoji}
+                  </button>
+                );
+              })}
 
-            {/* 코어 — 앵커(0,0) 중심. 탭하면 아크 토글. */}
-            <button
-              onClick={() => setMenuOpen((v) => !v)}
-              aria-label="OMNI 코어"
-              className="pointer-events-auto absolute left-0 top-0 grid h-[76px] w-[76px] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full"
-              style={{ filter: "drop-shadow(0 0 18px rgba(56,189,248,0.4))" }}
-            >
-              <GradientOrb
-                audioRef={audioLvl}
-                className="pointer-events-none"
-                config={{ hue: 0, rotationSpeed: micOn ? 0.6 : 0.3 }}
-              />
-            </button>
+              {/* 코어 — 탭하면 아크 토글 */}
+              <button
+                onClick={() => setMenuOpen((v) => !v)}
+                aria-label="OMNI 코어"
+                className="pointer-events-auto grid h-[76px] w-[76px] place-items-center rounded-full"
+                style={{ filter: "drop-shadow(0 0 18px rgba(56,189,248,0.4))" }}
+              >
+                <GradientOrb
+                  audioRef={audioLvl}
+                  className="pointer-events-none"
+                  config={{ hue: 0, rotationSpeed: micOn ? 0.6 : 0.3 }}
+                />
+              </button>
+            </div>
           </div>
         );
       })()}

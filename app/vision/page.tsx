@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { HandTracker } from "@/components/HandTracker";
 import { ParticleField } from "@/components/ParticleField";
-import { useDraggable } from "@/hooks/useDraggable";
+import { GradientOrb } from "@/components/GradientOrb";
 import type { HandFrame } from "@/hooks/useHandTracking";
 import {
   type LinkNode,
@@ -170,32 +170,9 @@ export default function VisionPage() {
 
   const pinching = frame ? frame.pinch < 0.06 : false;
 
-  // 드래그 가능한 컨트롤 박스. 실제 크기 측정해 중앙 하단 정렬.
-  const ctrlBoxRef = useRef<HTMLDivElement>(null);
-  const { box: ctrl, setBox: setCtrl, dragProps: ctrlDrag } = useDraggable({
-    initial: { x: -9999, y: -9999, w: 430, h: 56 }, // 측정 전 화면 밖에 숨김
-  });
-  useEffect(() => {
-    const place = () => {
-      const el = ctrlBoxRef.current;
-      if (!el) return;
-      const w = el.offsetWidth;
-      const h = el.offsetHeight;
-      setCtrl((b) => ({
-        ...b,
-        w,
-        h,
-        x: Math.max(8, Math.round(window.innerWidth / 2 - w / 2)),
-        y: window.innerHeight - h - 28,
-      }));
-    };
-    place();
-    // 폰트 로딩 완료 후 폭이 바뀔 수 있어 한 번 더 정렬
-    if (document.fonts?.ready) document.fonts.ready.then(place);
-    window.addEventListener("resize", place);
-    return () => window.removeEventListener("resize", place);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // 코어 아크(설정) / 채팅 입력 토글
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
 
   return (
     <main className="relative h-screen w-screen overflow-hidden">
@@ -226,115 +203,76 @@ export default function VisionPage() {
         />
       )}
 
-      {/* 드래그 가능한 글래스 컨트롤 박스 */}
-      <div
-        ref={ctrlBoxRef}
-        className="glass fixed z-40 flex select-none items-center gap-3 rounded-2xl py-3 pl-2 pr-4 text-xs"
-        style={{ left: ctrl.x, top: ctrl.y, touchAction: "none" }}
-      >
-        {/* 그립 핸들 (이걸 잡고 이동) */}
-        <div
-          {...ctrlDrag}
-          className="flex h-7 w-5 items-center justify-center text-slate-500 hover:text-sky-300"
-          aria-label="이동"
-        >
-          <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor">
-            <circle cx="2.5" cy="3" r="1.2" /><circle cx="7.5" cy="3" r="1.2" />
-            <circle cx="2.5" cy="8" r="1.2" /><circle cx="7.5" cy="8" r="1.2" />
-            <circle cx="2.5" cy="13" r="1.2" /><circle cx="7.5" cy="13" r="1.2" />
-          </svg>
-        </div>
-        <div className="flex items-center gap-4">
-          {/* 감지 */}
-          <div className="flex flex-col items-center gap-0.5">
-            <span className="text-[10px] tracking-wider text-slate-400">감지</span>
-            <span
-              className={`flex items-center gap-1 ${
-                frame?.detected ? "text-emerald-300" : "text-slate-500"
-              }`}
-            >
-              <span
-                className={`h-1.5 w-1.5 rounded-full ${
-                  frame?.detected ? "bg-emerald-400" : "bg-slate-600"
-                }`}
-              />
-              {frame?.detected ? "YES" : "NO"}
-            </span>
+      {/* 상단 중앙: 로고 (메인·맵과 동일) */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/logo.svg"
+        alt="OMNI"
+        className="pointer-events-none absolute left-1/2 top-6 z-40 h-5 -translate-x-1/2 opacity-90"
+        draggable={false}
+      />
+
+      {/* 하단 중앙: OMNI 코어 + 탭 시 반원 설정 아크 (맵과 동일 패턴) */}
+      {(() => {
+        const items = [
+          {
+            key: "chat", emoji: "💬", label: "입력", active: chatOpen,
+            onClick: () => { setChatOpen((v) => !v); setMenuOpen(false); },
+          },
+          { key: "cam", emoji: "✋", label: active ? "카메라 ON" : "카메라", active, onClick: () => setActive((v) => !v) },
+          {
+            key: "link", emoji: "🔗", label: "링크", active: manageOpen,
+            onClick: () => { setManageOpen((v) => !v); setMenuOpen(false); },
+          },
+          { key: "map", emoji: "🗺", label: "MAP", active: false, href: "/map" },
+          { key: "omni", emoji: "⌂", label: "OMNI", active: false, href: "/" },
+        ];
+        const R = 122;
+        const start = -164,
+          end = -16;
+        return (
+          <div className="pointer-events-none absolute inset-x-0 bottom-16 z-40 flex justify-center">
+            <div className="relative h-[76px] w-[76px]">
+              {items.map((it, i) => {
+                const deg = start + (i * (end - start)) / (items.length - 1);
+                const dx = Math.round(R * Math.cos((deg * Math.PI) / 180));
+                const dy = Math.round(R * Math.sin((deg * Math.PI) / 180));
+                const common = {
+                  title: it.label,
+                  className: `absolute left-1/2 top-1/2 grid h-12 w-12 place-items-center rounded-full border text-[18px] transition-all duration-300 ${
+                    it.active
+                      ? "border-sky-400/70 bg-sky-400/25 text-sky-100"
+                      : "border-white/15 bg-black/40 text-slate-200 hover:border-sky-400/50"
+                  }`,
+                  style: {
+                    transform: menuOpen
+                      ? `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(1)`
+                      : "translate(-50%, -50%) scale(0.3)",
+                    opacity: menuOpen ? 1 : 0,
+                    pointerEvents: (menuOpen ? "auto" : "none") as "auto" | "none",
+                    transitionDelay: `${(menuOpen ? i : items.length - i) * 30}ms`,
+                    backdropFilter: "blur(8px)",
+                  } as React.CSSProperties,
+                };
+                return it.href ? (
+                  <a key={it.key} href={it.href} {...common}>{it.emoji}</a>
+                ) : (
+                  <button key={it.key} onClick={it.onClick} {...common}>{it.emoji}</button>
+                );
+              })}
+
+              <button
+                onClick={() => setMenuOpen((v) => !v)}
+                aria-label="OMNI 코어"
+                className="pointer-events-auto grid h-[76px] w-[76px] place-items-center rounded-full"
+                style={{ filter: "drop-shadow(0 0 18px rgba(56,189,248,0.4))" }}
+              >
+                <GradientOrb className="pointer-events-none" config={{ hue: 0, rotationSpeed: 0.3 }} />
+              </button>
+            </div>
           </div>
-
-          <span className="h-7 w-px bg-white/10" />
-
-          {/* 핀치값 */}
-          <div className="flex flex-col items-center gap-0.5">
-            <span className="text-[10px] tracking-wider text-slate-400">핀치</span>
-            <span className="font-mono text-sky-200">
-              {frame ? frame.pinch.toFixed(3) : "—"}
-            </span>
-          </div>
-
-          <span className="h-7 w-px bg-white/10" />
-
-          {/* 상태 */}
-          <div className="flex flex-col items-center gap-0.5">
-            <span className="text-[10px] tracking-wider text-slate-400">상태</span>
-            <span className={pinching ? "text-emerald-300" : "text-sky-200"}>
-              {pinching ? "PINCH" : frame?.detected ? "OPEN" : "—"}
-            </span>
-          </div>
-
-          <span className="h-7 w-px bg-white/10" />
-
-          {/* 카메라 토글 */}
-          <button
-            onClick={() => setActive((v) => !v)}
-            className="flex items-center gap-2"
-            aria-label="카메라 토글"
-          >
-            <span className="text-[10px] tracking-wider text-slate-400">CAM</span>
-            <span
-              className={`relative h-5 w-9 rounded-full transition-colors ${
-                active ? "bg-sky-500/70" : "bg-slate-600/60"
-              }`}
-            >
-              <span
-                className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${
-                  active ? "left-[18px]" : "left-0.5"
-                }`}
-              />
-            </span>
-          </button>
-
-          <span className="h-7 w-px bg-white/10" />
-
-          {/* 링크 관리 */}
-          <button
-            onClick={() => setManageOpen((v) => !v)}
-            className={`rounded-lg px-2 py-1 tracking-wider transition ${
-              manageOpen ? "text-sky-300" : "text-slate-300 hover:text-sky-300"
-            }`}
-          >
-            링크
-          </button>
-
-          <span className="h-7 w-px bg-white/10" />
-
-          {/* MAP 모드 */}
-          <a
-            href="/map"
-            className="rounded-lg px-2 py-1 tracking-widest text-slate-300 transition hover:text-sky-300"
-          >
-            MAP
-          </a>
-
-          {/* OMNI 메인 */}
-          <a
-            href="/"
-            className="rounded-lg px-2 py-1 tracking-widest text-slate-300 transition hover:text-sky-300"
-          >
-            OMNI
-          </a>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* 링크 관리 패널 — 좌측 슬라이드인 */}
       <div
@@ -455,25 +393,36 @@ export default function VisionPage() {
         </div>
       )}
 
-      {/* 대화 입력창 — 상단 중앙(지도와 동일 위치). 링크 추가/삭제·모드전환·질문. */}
-      <form
-        onSubmit={submitCmd}
-        className="glass absolute left-1/2 top-5 z-40 flex w-[min(92vw,440px)] -translate-x-1/2 items-center gap-2 rounded-2xl px-3 py-2"
-      >
-        <input
-          value={cmd}
-          onChange={(e) => setCmd(e.target.value)}
-          placeholder="말하듯 입력 — 예: 유튜브 추가, 노션 빼줘, 맵 열어"
-          className="h-9 min-w-0 flex-1 bg-transparent text-[14px] text-sky-50 placeholder:text-slate-400/70 outline-none"
-        />
-        <button
-          type="submit"
-          disabled={busy}
-          className="glass-btn h-9 shrink-0 rounded-xl px-4 text-[13px] font-medium disabled:opacity-50"
+      {/* 대화 입력창 — 코어의 채팅 아이콘으로 토글. 로고 아래(top-16). */}
+      {chatOpen && (
+        <form
+          onSubmit={submitCmd}
+          className="glass absolute left-1/2 top-16 z-40 flex w-[min(92vw,440px)] -translate-x-1/2 items-center gap-2 rounded-2xl px-3 py-2"
         >
-          전송
-        </button>
-      </form>
+          <input
+            autoFocus
+            value={cmd}
+            onChange={(e) => setCmd(e.target.value)}
+            placeholder="말하듯 입력 — 예: 유튜브 추가, 노션 빼줘, 맵 열어"
+            className="h-9 min-w-0 flex-1 bg-transparent text-[14px] text-sky-50 placeholder:text-slate-400/70 outline-none"
+          />
+          <button
+            type="submit"
+            disabled={busy}
+            className="glass-btn h-9 shrink-0 rounded-xl px-4 text-[13px] font-medium disabled:opacity-50"
+          >
+            전송
+          </button>
+          <button
+            type="button"
+            onClick={() => setChatOpen(false)}
+            aria-label="닫기"
+            className="shrink-0 px-1 text-slate-400 transition hover:text-sky-300"
+          >
+            ✕
+          </button>
+        </form>
+      )}
 
       <HandTracker active={active} onFrame={onFrame} showPreview={active} />
     </main>
