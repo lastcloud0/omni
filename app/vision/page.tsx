@@ -264,7 +264,7 @@ export default function VisionPage() {
               <button
                 onClick={() => setMenuOpen((v) => !v)}
                 aria-label="OMNI 코어"
-                className="pointer-events-auto relative grid h-[76px] w-[76px] place-items-center rounded-full"
+                className="pointer-events-auto relative h-[76px] w-[76px] rounded-full"
                 style={{ filter: "drop-shadow(0 0 18px rgba(56,189,248,0.4))" }}
               >
                 <GradientOrb className="pointer-events-none" config={{ hue: 0, rotationSpeed: 0.3 }} />
