@@ -17,6 +17,8 @@ import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { HandTracker } from "@/components/HandTracker";
 import { createGestureReader } from "@/lib/handGesture";
 import type { HandFrame } from "@/hooks/useHandTracking";
+import { GradientOrb } from "@/components/GradientOrb";
+import { useAudioLevel } from "@/hooks/useAudioLevel";
 import {
   fetchRoute,
   formatRoute,
@@ -36,7 +38,7 @@ const TILT = 60;
 // 제스처 판정(데드존·히스테리시스·강도)은 VISION과 100% 동일한 공용 모듈을 쓴다.
 // 여기 두 상수는 "단위 변환"일 뿐 — VISION은 카메라 거리, MAP은 bearing(도)/zoom(레벨).
 const HAND_BEARING_DEG = 180 / Math.PI; // 회전: rad/프레임 → 도/프레임 (동일 각속도)
-const HAND_ZOOM_PER_UNIT = 1.2; // 줌: VISION 카메라거리 1단위 ≈ 지도 줌 1.2레벨
+const HAND_ZOOM_GAIN = 0.06; // 줌: openness rate(-1..1) → 지도 줌레벨/프레임 (느리게)
 const MAP_ZOOM_MIN = 2;
 const MAP_ZOOM_MAX = 19;
 
@@ -86,6 +88,12 @@ export function OmniMap() {
   const [camOn, setCamOn] = useState(false); // 핸드 컨트롤(웹캠)
   const [handFrame, setHandFrame] = useState<HandFrame | null>(null);
   const gesture = useRef(createGestureReader());
+  const [menuOpen, setMenuOpen] = useState(false); // 코어 탭 → 반원 설정 아크
+
+  // 코어 음성반응 — 마이크 켜졌을 때 오디오 레벨로 맥동.
+  const { level: audioLevel } = useAudioLevel(micOn);
+  const audioLvl = useRef(0);
+  audioLvl.current = audioLevel;
   const [sound, setSound] = useState(false); // OMNI 음성 요약 on/off
   const soundRef = useRef(false);
   soundRef.current = sound;
@@ -511,9 +519,9 @@ export function OmniMap() {
     if (g.spin) {
       map.setBearing(map.getBearing() + g.spin * HAND_BEARING_DEG);
     }
-    if (g.zoomDelta !== 0) {
-      // 오므림(음수) = 줌인 → 지도 줌 레벨은 증가
-      const next = map.getZoom() - g.zoomDelta * HAND_ZOOM_PER_UNIT;
+    if (g.zoomRate !== 0) {
+      // zoomRate 음수=오므림=줌인 → 지도 줌 레벨 증가. 감도 느리게.
+      const next = map.getZoom() - g.zoomRate * HAND_ZOOM_GAIN;
       map.setZoom(Math.max(MAP_ZOOM_MIN, Math.min(MAP_ZOOM_MAX, next)));
     }
   }, []);
@@ -978,83 +986,83 @@ export function OmniMap() {
         </div>
       )}
 
-      {/* 하단 중앙: 글래스 컨트롤 박스 (VISION과 동일 톤) */}
-      <div className="glass absolute bottom-7 left-1/2 z-40 flex -translate-x-1/2 select-none items-center gap-4 rounded-2xl px-4 py-3 text-xs">
-        <div className="flex flex-col items-center gap-0.5">
-          <span className="text-[10px] tracking-wider text-slate-400">줌</span>
-          <span className="font-mono text-sky-200">{zoom.toFixed(1)}</span>
-        </div>
+      {/* 하단 중앙: OMNI 코어 + 탭 시 반원 설정 아크 */}
+      {(() => {
+        // 설정 아이템 — 코어 위쪽 반원(θ: -160°~-20°)에 등간격.
+        const items = [
+          { key: "tilt", emoji: pitch > 10 ? "◨" : "▭", label: "기울이기", active: pitch > 10, onClick: toggleTilt },
+          { key: "home", emoji: "🌐", label: "지구본", active: false, onClick: goHome },
+          {
+            key: "pins", emoji: "📍", label: "핀 지우기", active: false,
+            disabled: pins.length === 0, onClick: clearPins,
+          },
+          { key: "sound", emoji: sound ? "🔊" : "🔇", label: "음성요약", active: sound, onClick: toggleSound },
+          ...(micSupported
+            ? [{ key: "mic", emoji: "🎙", label: micOn ? "듣는중" : "명령", active: micOn, onClick: () => setMicOn((v) => !v) }]
+            : []),
+          { key: "hand", emoji: "✋", label: "핸드", active: camOn, onClick: () => setCamOn((v) => !v) },
+          { key: "omni", emoji: "⌂", label: "OMNI", active: false, href: "/" },
+        ];
+        const R = 104;
+        const start = -160,
+          end = -20;
+        return (
+          <div className="absolute bottom-8 left-1/2 z-40 -translate-x-1/2">
+            {/* 반원 아크 아이템 */}
+            {items.map((it, i) => {
+              const deg = items.length > 1 ? start + (i * (end - start)) / (items.length - 1) : -90;
+              const dx = Math.round(R * Math.cos((deg * Math.PI) / 180));
+              const dy = Math.round(R * Math.sin((deg * Math.PI) / 180));
+              const common = {
+                title: it.label,
+                className: `absolute left-1/2 top-1/2 grid h-11 w-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border text-[17px] transition-all duration-300 ${
+                  it.active
+                    ? "border-sky-400/70 bg-sky-400/20 text-sky-100"
+                    : "border-white/15 bg-white/[0.06] text-slate-200 hover:border-sky-400/50"
+                } ${"disabled" in it && it.disabled ? "opacity-30" : ""}`,
+                style: {
+                  transform: menuOpen
+                    ? `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(1)`
+                    : "translate(-50%, -50%) scale(0.3)",
+                  opacity: menuOpen ? 1 : 0,
+                  pointerEvents: (menuOpen ? "auto" : "none") as "auto" | "none",
+                  transitionDelay: `${(menuOpen ? i : items.length - i) * 28}ms`,
+                  backdropFilter: "blur(8px)",
+                } as React.CSSProperties,
+              };
+              return it.href ? (
+                <a key={it.key} href={it.href} {...common}>
+                  {it.emoji}
+                </a>
+              ) : (
+                <button
+                  key={it.key}
+                  onClick={() => {
+                    if (!("disabled" in it && it.disabled)) it.onClick?.();
+                  }}
+                  {...common}
+                >
+                  {it.emoji}
+                </button>
+              );
+            })}
 
-        <span className="h-7 w-px bg-white/10" />
-
-        <div className="flex flex-col items-center gap-0.5">
-          <span className="text-[10px] tracking-wider text-slate-400">건물</span>
-          <span className={zoom >= BUILDING_ZOOM ? "text-emerald-300" : "text-slate-500"}>
-            {zoom >= BUILDING_ZOOM ? "3D" : "—"}
-          </span>
-        </div>
-
-        <span className="h-7 w-px bg-white/10" />
-
-        <button
-          onClick={toggleTilt}
-          className={`rounded-lg px-2 py-1 tracking-wider transition ${
-            pitch > 10 ? "text-sky-300" : "text-slate-300 hover:text-sky-300"
-          }`}
-        >
-          기울이기
-        </button>
-
-        <button onClick={goHome} className="rounded-lg px-2 py-1 tracking-wider text-slate-300 transition hover:text-sky-300">
-          지구본
-        </button>
-
-        <button
-          onClick={clearPins}
-          disabled={pins.length === 0}
-          className="rounded-lg px-2 py-1 tracking-wider text-slate-300 transition hover:text-sky-300 disabled:text-slate-600 disabled:hover:text-slate-600"
-        >
-          핀 지우기{pins.length ? ` (${pins.length})` : ""}
-        </button>
-
-        <button
-          onClick={toggleSound}
-          title="경로를 OMNI 음성으로 요약"
-          className={`rounded-lg px-2 py-1 tracking-wider transition ${
-            sound ? "text-sky-300" : "text-slate-300 hover:text-sky-300"
-          }`}
-        >
-          {sound ? "🔊 음성" : "🔇 음성"}
-        </button>
-
-        {micSupported && (
-          <button
-            onClick={() => setMicOn((v) => !v)}
-            title='음성 명령: "옴니, 강남역 길찾기" / "근처 카페"'
-            className={`rounded-lg px-2 py-1 tracking-wider transition ${
-              micOn ? "text-emerald-300" : "text-slate-300 hover:text-sky-300"
-            }`}
-          >
-            {micOn ? "🎙 듣는중" : "🎙 명령"}
-          </button>
-        )}
-
-        <button
-          onClick={() => setCamOn((v) => !v)}
-          title="손 제스처: 손목 비틀기=회전, 핀치=줌 (VISION과 동일 감도)"
-          className={`rounded-lg px-2 py-1 tracking-wider transition ${
-            camOn ? "text-emerald-300" : "text-slate-300 hover:text-sky-300"
-          }`}
-        >
-          {camOn ? "✋ 핸드ON" : "✋ 핸드"}
-        </button>
-
-        <span className="h-7 w-px bg-white/10" />
-
-        <a href="/" className="rounded-lg px-2 py-1 tracking-widest text-slate-300 transition hover:text-sky-300">
-          OMNI
-        </a>
-      </div>
+            {/* 코어 — 음성반응 셰이더. 탭하면 아크 토글. */}
+            <button
+              onClick={() => setMenuOpen((v) => !v)}
+              aria-label="OMNI 코어"
+              className="relative grid h-[72px] w-[72px] place-items-center rounded-full"
+              style={{ filter: "drop-shadow(0 0 18px rgba(56,189,248,0.4))" }}
+            >
+              <GradientOrb
+                audioRef={audioLvl}
+                className="pointer-events-none"
+                config={{ hue: 0, rotationSpeed: micOn ? 0.6 : 0.3 }}
+              />
+            </button>
+          </div>
+        );
+      })()}
 
       {/* 손 포인터 오버레이 (VISION과 동일 룩) */}
       {camOn && handFrame?.detected && handFrame.pointer && (

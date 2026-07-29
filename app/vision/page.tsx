@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { HandTracker } from "@/components/HandTracker";
 import { ParticleField } from "@/components/ParticleField";
 import { useDraggable } from "@/hooks/useDraggable";
@@ -11,6 +12,7 @@ import {
   saveLinks,
   deriveLink,
 } from "@/lib/linkNodes";
+import { askAI } from "@/lib/aiClient";
 // 제스처 판정은 MAP과 공용 모듈을 쓴다 (감도 단일 출처).
 import { createGestureReader } from "@/lib/handGesture";
 
@@ -49,6 +51,67 @@ export default function VisionPage() {
     setAddErr("");
   };
   const removeLink = (id: string) => persist(links.filter((l) => l.id !== id));
+
+  // ── 대화 입력창 (텍스트 명령) ────────────────────────────────
+  const router = useRouter();
+  const [cmd, setCmd] = useState("");
+  const [reply, setReply] = useState(""); // 처리 결과/AI 답변 자막
+  const [busy, setBusy] = useState(false);
+
+  const runVisionCommand = async (raw: string) => {
+    const t = raw.trim();
+    if (!t) return;
+    const flat = t.replace(/\s/g, "");
+    // 모드 전환
+    if (/(맵|지도)/.test(flat)) return router.push("/map");
+    if (/(메인|홈|처음|나가)/.test(flat)) return router.push("/");
+    // 링크 삭제: "○○ 빼/삭제/제거/지워"
+    if (/(빼|삭제|제거|지워|없애)/.test(flat)) {
+      const name = t.replace(/(빼줘|빼|삭제해|삭제|제거해|제거|지워줘|지워|없애줘|없애|링크)/g, "").trim();
+      const hit = links.find(
+        (l) => name && (l.label.toLowerCase().includes(name.toLowerCase()) || l.url.includes(name))
+      );
+      if (hit) {
+        removeLink(hit.id);
+        setReply(`${hit.label} 링크를 뺐습니다`);
+      } else setReply(`"${name}" 링크를 찾지 못했습니다`);
+      return;
+    }
+    // 링크 추가: URL스러운 토큰이 있거나 "추가/넣어/등록"
+    const urlTok = t.match(/https?:\/\/\S+|[\w-]+\.[\w.]{2,}\S*/)?.[0];
+    if (urlTok || /(추가|넣어|등록)/.test(flat)) {
+      const node = deriveLink(urlTok || t.replace(/(추가해|추가|넣어줘|넣어|등록해|등록|링크)/g, "").trim());
+      if (!node) return setReply("추가할 URL을 인식하지 못했습니다");
+      if (links.some((l) => l.url === node.url)) return setReply("이미 추가된 링크입니다");
+      persist([...links, node]);
+      setReply(`${node.label} 링크를 추가했습니다`);
+      return;
+    }
+    // 그 외 → AI에게 질문 (답변 자막)
+    setBusy(true);
+    setReply("…");
+    try {
+      const { reply: ans } = await askAI(t);
+      setReply(ans);
+    } catch {
+      setReply("응답을 받지 못했습니다");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitCmd = (e: React.FormEvent) => {
+    e.preventDefault();
+    runVisionCommand(cmd);
+    setCmd("");
+  };
+
+  // 자막 auto-clear
+  useEffect(() => {
+    if (!reply || reply === "…") return;
+    const t = window.setTimeout(() => setReply(""), 7000);
+    return () => window.clearTimeout(t);
+  }, [reply]);
 
   // 드래그 앤 드롭 재정렬
   const dragId = useRef<string | null>(null);
@@ -94,12 +157,13 @@ export default function VisionPage() {
     // 노드 위에 손이 있으면 선택 우선 — 회전·줌 억제.
     const g = gesture.current.read(f, { suppress: hoverRef.current != null });
 
-    pinchRef.current = g.pinch;
+    pinchRef.current = g.pinch; // 노드 클릭(핀치) 판정용 원시값
     pointerRef.current = g.pointer;
     spinRef.current = g.spin; // 손 없으면 null → 자동회전
 
-    if (g.zoomDelta !== 0) {
-      camRef.current += g.zoomDelta; // 음수=오므림 → 줌인
+    // 절대 openness 줌 rate(-1..1)를 카메라 거리로 스케일. 음수=줌인.
+    if (g.zoomRate !== 0) {
+      camRef.current += g.zoomRate * 0.05;
       camRef.current = Math.max(0.5, Math.min(3.4, camRef.current));
     }
   };
@@ -383,6 +447,33 @@ export default function VisionPage() {
           이 브라우저에 저장됩니다 · {links.length}개
         </div>
       </div>
+
+      {/* 처리 결과 / AI 답변 자막 */}
+      {reply && (
+        <div className="pointer-events-none absolute bottom-24 left-1/2 z-40 max-w-[86vw] -translate-x-1/2 rounded-2xl bg-black/60 px-4 py-2 text-center text-[14px] text-sky-100 backdrop-blur-sm">
+          {reply === "…" ? <span className="text-sky-300/80">생각 중…</span> : reply}
+        </div>
+      )}
+
+      {/* 대화 입력창 — 상단 중앙(지도와 동일 위치). 링크 추가/삭제·모드전환·질문. */}
+      <form
+        onSubmit={submitCmd}
+        className="glass absolute left-1/2 top-5 z-40 flex w-[min(92vw,440px)] -translate-x-1/2 items-center gap-2 rounded-2xl px-3 py-2"
+      >
+        <input
+          value={cmd}
+          onChange={(e) => setCmd(e.target.value)}
+          placeholder="말하듯 입력 — 예: 유튜브 추가, 노션 빼줘, 맵 열어"
+          className="h-9 min-w-0 flex-1 bg-transparent text-[14px] text-sky-50 placeholder:text-slate-400/70 outline-none"
+        />
+        <button
+          type="submit"
+          disabled={busy}
+          className="glass-btn h-9 shrink-0 rounded-xl px-4 text-[13px] font-medium disabled:opacity-50"
+        >
+          전송
+        </button>
+      </form>
 
       <HandTracker active={active} onFrame={onFrame} showPreview={active} />
     </main>
