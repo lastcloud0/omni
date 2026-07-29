@@ -524,6 +524,16 @@ export function OmniMap() {
       const next = map.getZoom() - g.zoomRate * HAND_ZOOM_GAIN;
       map.setZoom(Math.max(MAP_ZOOM_MIN, Math.min(MAP_ZOOM_MAX, next)));
     }
+    // 핸드 줌은 매 프레임 setZoom이라 zoomend 자동기울임을 끊어버린다.
+    // → 건물 레벨에서 pitch를 직접 눕혀준다(부드럽게). 줌아웃하면 다시 눕힘 유지.
+    const z = map.getZoom();
+    if (z >= BUILDING_ZOOM) {
+      const p = map.getPitch();
+      if (p < TILT - 1) {
+        map.setPitch(Math.min(TILT, p + 2));
+        autoTilted.current = true;
+      }
+    }
   }, []);
 
   // ── 업종 필터 ────────────────────────────────────────────────
@@ -986,9 +996,10 @@ export function OmniMap() {
         </div>
       )}
 
-      {/* 하단 중앙: OMNI 코어 + 탭 시 반원 설정 아크 */}
+      {/* 하단 중앙: OMNI 코어 + 탭 시 반원 설정 아크.
+          0크기 앵커(정확히 화면 하단중앙)를 기준으로 코어·아크를 절대배치 → 중앙 고정. */}
       {(() => {
-        // 설정 아이템 — 코어 위쪽 반원(θ: -160°~-20°)에 등간격.
+        // 설정 아이템 — 코어 위쪽 반원에 등간격.
         const items = [
           { key: "tilt", emoji: pitch > 10 ? "◨" : "▭", label: "기울이기", active: pitch > 10, onClick: toggleTilt },
           { key: "home", emoji: "🌐", label: "지구본", active: false, onClick: goHome },
@@ -1003,22 +1014,22 @@ export function OmniMap() {
           { key: "hand", emoji: "✋", label: "핸드", active: camOn, onClick: () => setCamOn((v) => !v) },
           { key: "omni", emoji: "⌂", label: "OMNI", active: false, href: "/" },
         ];
-        const R = 104;
-        const start = -160,
-          end = -20;
+        const R = 128; // 아크 반경(간격 넓게)
+        const start = -168,
+          end = -12; // 위쪽 반원 각도 폭
         return (
-          <div className="absolute bottom-8 left-1/2 z-40 -translate-x-1/2">
-            {/* 반원 아크 아이템 */}
+          <div className="pointer-events-none absolute bottom-16 left-1/2 z-40 h-0 w-0">
+            {/* 반원 아크 아이템 (앵커(0,0) 기준) */}
             {items.map((it, i) => {
               const deg = items.length > 1 ? start + (i * (end - start)) / (items.length - 1) : -90;
               const dx = Math.round(R * Math.cos((deg * Math.PI) / 180));
               const dy = Math.round(R * Math.sin((deg * Math.PI) / 180));
               const common = {
                 title: it.label,
-                className: `absolute left-1/2 top-1/2 grid h-11 w-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border text-[17px] transition-all duration-300 ${
+                className: `absolute left-0 top-0 grid h-12 w-12 place-items-center rounded-full border text-[18px] transition-all duration-300 ${
                   it.active
-                    ? "border-sky-400/70 bg-sky-400/20 text-sky-100"
-                    : "border-white/15 bg-white/[0.06] text-slate-200 hover:border-sky-400/50"
+                    ? "border-sky-400/70 bg-sky-400/25 text-sky-100"
+                    : "border-white/15 bg-black/40 text-slate-200 hover:border-sky-400/50"
                 } ${"disabled" in it && it.disabled ? "opacity-30" : ""}`,
                 style: {
                   transform: menuOpen
@@ -1026,7 +1037,7 @@ export function OmniMap() {
                     : "translate(-50%, -50%) scale(0.3)",
                   opacity: menuOpen ? 1 : 0,
                   pointerEvents: (menuOpen ? "auto" : "none") as "auto" | "none",
-                  transitionDelay: `${(menuOpen ? i : items.length - i) * 28}ms`,
+                  transitionDelay: `${(menuOpen ? i : items.length - i) * 30}ms`,
                   backdropFilter: "blur(8px)",
                 } as React.CSSProperties,
               };
@@ -1047,11 +1058,11 @@ export function OmniMap() {
               );
             })}
 
-            {/* 코어 — 음성반응 셰이더. 탭하면 아크 토글. */}
+            {/* 코어 — 앵커(0,0) 중심. 탭하면 아크 토글. */}
             <button
               onClick={() => setMenuOpen((v) => !v)}
               aria-label="OMNI 코어"
-              className="relative grid h-[72px] w-[72px] place-items-center rounded-full"
+              className="pointer-events-auto absolute left-0 top-0 grid h-[76px] w-[76px] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full"
               style={{ filter: "drop-shadow(0 0 18px rgba(56,189,248,0.4))" }}
             >
               <GradientOrb
