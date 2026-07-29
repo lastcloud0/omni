@@ -57,6 +57,16 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
+/* 미니 아이콘 3D 부유 — 떠서 살짝 도는 느낌 (좌우 스웨이 + 위아래 bob). */
+@keyframes omni-float3d {
+  0% { transform: translateY(0px) rotateY(-16deg) rotateX(7deg); }
+  50% { transform: translateY(-7px) rotateY(16deg) rotateX(-5deg); }
+  100% { transform: translateY(0px) rotateY(-16deg) rotateX(7deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .omni-float3d { animation: none !important; }
+}
+
 /* 글래스모피즘 CTA 버튼 — 시안 틴트 유리. SEND / 추가 등에 사용. */
 .glass-btn {
   background: rgba(56, 189, 248, 0.14);
