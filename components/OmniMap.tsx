@@ -12,7 +12,7 @@ import {
   poiCategoryFilter,
 } from "@/lib/mapStyle";
 import { searchPlaces, zoomForKind, type GeoResult } from "@/lib/geocode";
-import { parseMapCommand } from "@/lib/mapIntent";
+import { interpret, type MapResult } from "@/lib/mapAI";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { HandTracker } from "@/components/HandTracker";
 import { createGestureReader } from "@/lib/handGesture";
@@ -587,23 +587,22 @@ export function OmniMap() {
     []
   );
 
-  /** 음성 발화 → 의도 파싱 → 실행. */
-  const handleVoice = useCallback(
-    (text: string) => {
-      const intent = parseMapCommand(text);
-      switch (intent.type) {
+  /** 해석 결과(규칙/AI 공통) → 실제 실행. */
+  const dispatchResult = useCallback(
+    (r: MapResult, sourceText: string) => {
+      switch (r.type) {
         case "routeAB":
-          voiceRouteAB(intent.from, intent.to, intent.mode);
+          voiceRouteAB(r.from, r.to, r.mode);
           break;
         case "route":
-          voiceRoute(intent.query, intent.mode);
+          voiceRoute(r.query, r.mode);
           break;
         case "search":
-          voiceSearch(intent.query);
+          voiceSearch(r.query);
           break;
         case "filter":
-          applyCategory(intent.category);
-          setVoiceHint(`${intent.category}만 표시`);
+          applyCategory(r.category);
+          setVoiceHint(`${r.category}만 표시`);
           break;
         case "clearRoute":
           clearRoute();
@@ -620,8 +619,12 @@ export function OmniMap() {
         case "tilt":
           toggleTilt();
           break;
+        case "answer":
+          setVoiceHint(r.reply || "…");
+          if (soundRef.current && r.reply) speak(r.reply);
+          break;
         default:
-          setVoiceHint(`“${text}” 이해 못 함`);
+          setVoiceHint(`“${sourceText}” 이해하지 못했습니다`);
       }
     },
     // 핸들러들은 최신 클로저 사용
@@ -629,8 +632,20 @@ export function OmniMap() {
     [voiceRoute, voiceRouteAB, voiceSearch, applyCategory]
   );
 
+  /** 발화/입력 하나를 해석(규칙→AI)해서 실행. 음성·검색창 공용. */
+  const runCommand = useCallback(
+    async (text: string) => {
+      const t = text.trim();
+      if (!t) return;
+      setVoiceHint("해석 중…");
+      const r = await interpret(t);
+      dispatchResult(r, t);
+    },
+    [dispatchResult]
+  );
+
   const { supported: micSupported, interim: micInterim, start: micStart, stop: micStop } =
-    useSpeechRecognition({ lang: "ko-KR", onFinal: handleVoice });
+    useSpeechRecognition({ lang: "ko-KR", onFinal: runCommand });
 
   // 마이크 토글에 따라 인식 시작/정지.
   useEffect(() => {
@@ -657,6 +672,13 @@ export function OmniMap() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready]);
 
+  // 명령 결과 자막은 잠시 뒤 사라진다 ("해석 중…"은 결과가 덮어씀).
+  useEffect(() => {
+    if (!voiceHint || voiceHint === "해석 중…") return;
+    const t = window.setTimeout(() => setVoiceHint(""), 6000);
+    return () => window.clearTimeout(t);
+  }, [voiceHint]);
+
   const goHome = () => {
     autoTilted.current = false;
     flyRef.current.cancel = true;
@@ -671,9 +693,16 @@ export function OmniMap() {
     map.easeTo({ pitch: next, duration: 700 });
   };
 
+  // 상단 입력창 = 대화 창구. 엔터 시 규칙→AI로 해석해 실행.
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (results[0]) goTo(results[0]);
+    const q = query.trim();
+    if (!q) return;
+    setOpenList(false);
+    setResults([]);
+    runCommand(q);
+    // 명령(경로·필터 등)이면 입력창 비움. 단순 검색은 goTo가 장소명으로 채운다.
+    setQuery("");
   };
 
   return (
@@ -866,7 +895,7 @@ export function OmniMap() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => results.length && setOpenList(true)}
-            placeholder="장소 검색 — 예: 경복궁, 부산역, Eiffel Tower"
+            placeholder="검색하거나 명령하세요 — 예: 강남역에서 코엑스 경로, 근처 카페"
             className="h-8 min-w-0 flex-1 bg-transparent text-[14px] text-sky-50 placeholder:text-slate-400/70 outline-none"
           />
           {query && (
@@ -938,10 +967,10 @@ export function OmniMap() {
         </div>
       </div>
 
-      {/* 음성 명령 안내 자막 — 마이크 켜졌을 때 */}
-      {micOn && (micInterim || voiceHint) && (
-        <div className="pointer-events-none absolute bottom-24 left-1/2 z-40 -translate-x-1/2 rounded-full bg-black/60 px-4 py-1.5 text-center text-[13px] backdrop-blur-sm">
-          {micInterim ? (
+      {/* OMNI 자막 — 음성 받아쓰기(마이크) 또는 명령 해석 결과(음성·텍스트 공통) */}
+      {((micOn && micInterim) || voiceHint) && (
+        <div className="pointer-events-none absolute bottom-24 left-1/2 z-40 max-w-[86vw] -translate-x-1/2 rounded-full bg-black/60 px-4 py-1.5 text-center text-[13px] backdrop-blur-sm">
+          {micOn && micInterim ? (
             <span className="text-sky-200/90">“{micInterim}”</span>
           ) : (
             <span className="text-emerald-300/90">{voiceHint}</span>
