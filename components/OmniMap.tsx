@@ -90,6 +90,7 @@ export function OmniMap() {
   const gesture = useRef(createGestureReader());
   const [menuOpen, setMenuOpen] = useState(false); // 코어 탭 → 반원 설정 아크
   const [chatOpen, setChatOpen] = useState(false); // 코어→채팅 아이콘 → 입력창
+  const [routeExpanded, setRouteExpanded] = useState(false); // 경로 회전안내 펼침
 
   // 코어 음성반응 — 마이크 켜졌을 때 오디오 레벨로 맥동.
   const { level: audioLevel } = useAudioLevel(micOn);
@@ -461,6 +462,7 @@ export function OmniMap() {
     routeAbort.current?.abort();
     flyRef.current.cancel = true;
     stopSpeaking();
+    setRouteExpanded(false); // 새 경로는 접힌 상태로 시작
     const ac = new AbortController();
     routeAbort.current = ac;
     setRoute({ mode, label: "", loading: true, destName: toName });
@@ -813,84 +815,92 @@ export function OmniMap() {
         </div>
       )}
 
-      {/* 경로 정보 박스 — 도로·회전 상세 (팝업) */}
+      {/* 경로 정보 박스 — 모바일에선 컴팩트(접힘), 데스크톱은 넓게 */}
       {route?.result && !route.loading && !route.error && (
-        <div className="glass absolute left-3 top-20 z-40 w-[min(86vw,300px)] rounded-2xl p-3.5">
+        <div className="glass absolute left-2 top-16 z-40 w-[min(72vw,270px)] rounded-2xl p-3 sm:left-3 sm:top-20 sm:w-[300px] sm:p-3.5">
           <div className="mb-2 flex items-start justify-between gap-2">
-            <div>
+            <div className="min-w-0">
               <div className="text-[10px] tracking-wider text-sky-300/80">
-                {route.mode === "walking" ? "🚶 도보 경로" : "🚗 자동차 경로"}
+                {route.mode === "walking" ? "🚶 도보" : "🚗 자동차"}
               </div>
-              <div className="text-[14px] font-medium text-sky-50">
+              <div className="truncate text-[14px] font-medium text-sky-50">
                 {route.destName || "목적지"}까지
               </div>
             </div>
             <button
               onClick={clearRoute}
               aria-label="경로 닫기"
-              className="text-slate-400 transition hover:text-sky-300"
+              className="shrink-0 text-slate-400 transition hover:text-sky-300"
             >
               ✕
             </button>
           </div>
 
-          <div className="mb-2.5 flex items-center gap-2">
+          <div className="mb-2 flex items-center gap-2">
             <span className="font-mono text-[15px] text-emerald-300">{route.label}</span>
-            <span className="text-[10px] text-slate-500">· {route.result.steps.length}개 구간</span>
+            <span className="text-[10px] text-slate-500">· {route.result.steps.length}구간</span>
           </div>
 
-          {/* OMNI 음성 요약 */}
-          <div className="mb-2.5 flex items-center gap-2">
+          {/* 음성요약 + 상세 토글 */}
+          <div className="flex flex-wrap items-center gap-1.5">
             <button
               onClick={toggleSound}
-              className={`flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] transition ${
+              className={`rounded-md border px-2 py-1 text-[11px] transition ${
                 sound
                   ? "border-sky-400/70 bg-sky-400/15 text-sky-100"
                   : "border-white/15 text-slate-300 hover:border-sky-400/50"
               }`}
             >
-              {sound ? "🔊" : "🔇"} 음성요약 {sound ? "ON" : "OFF"}
+              {sound ? "🔊" : "🔇"} 음성 {sound ? "ON" : "OFF"}
             </button>
             <button
               onClick={() => route.result && speak(speakableSummary(route.result, route.mode, route.destName))}
               className="rounded-md border border-sky-400/30 px-2 py-1 text-[11px] text-sky-200 transition hover:border-sky-400/70 hover:bg-sky-400/10"
             >
-              ▶ 다시 듣기
+              ▶ 듣기
+            </button>
+            <button
+              onClick={() => setRouteExpanded((v) => !v)}
+              className="rounded-md border border-white/15 px-2 py-1 text-[11px] text-slate-300 transition hover:border-sky-400/50"
+            >
+              {routeExpanded ? "접기 ▴" : "상세 ▾"}
             </button>
           </div>
 
-          {/* 주요 도로 */}
-          {route.result.mainRoads.length > 0 && (
-            <div className="mb-2 flex flex-wrap gap-1.5">
-              {route.result.mainRoads.slice(0, 6).map((rd, i) => (
-                <span
-                  key={i}
-                  className="rounded-full border border-sky-400/20 bg-sky-400/5 px-2 py-0.5 text-[10px] text-sky-200"
-                >
-                  {rd}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {/* 회전 안내 (스크롤) */}
-          <div className="max-h-[28vh] space-y-1 overflow-y-auto pr-1">
-            {route.result.steps
-              .filter((s) => s.road || s.maneuver === "도착" || s.maneuver === "출발")
-              .map((s, i) => (
-                <div key={i} className="flex items-baseline gap-2 text-[11px]">
-                  <span className="w-9 shrink-0 text-sky-300/70">{s.maneuver}</span>
-                  <span className="flex-1 truncate text-slate-200">{s.road || "—"}</span>
-                  {s.distance >= 1 && (
-                    <span className="shrink-0 font-mono text-[10px] text-slate-500">
-                      {s.distance >= 1000
-                        ? `${(s.distance / 1000).toFixed(1)}km`
-                        : `${Math.round(s.distance)}m`}
+          {/* 상세 — 펼칠 때만 (모바일 화면 가림 방지) */}
+          {routeExpanded && (
+            <>
+              {route.result.mainRoads.length > 0 && (
+                <div className="mb-2 mt-2.5 flex flex-wrap gap-1.5">
+                  {route.result.mainRoads.slice(0, 6).map((rd, i) => (
+                    <span
+                      key={i}
+                      className="rounded-full border border-sky-400/20 bg-sky-400/5 px-2 py-0.5 text-[10px] text-sky-200"
+                    >
+                      {rd}
                     </span>
-                  )}
+                  ))}
                 </div>
-              ))}
-          </div>
+              )}
+              <div className="max-h-[32vh] space-y-1 overflow-y-auto pr-1">
+                {route.result.steps
+                  .filter((s) => s.road || s.maneuver === "도착" || s.maneuver === "출발")
+                  .map((s, i) => (
+                    <div key={i} className="flex items-baseline gap-2 text-[11px]">
+                      <span className="w-9 shrink-0 text-sky-300/70">{s.maneuver}</span>
+                      <span className="flex-1 truncate text-slate-200">{s.road || "—"}</span>
+                      {s.distance >= 1 && (
+                        <span className="shrink-0 font-mono text-[10px] text-slate-500">
+                          {s.distance >= 1000
+                            ? `${(s.distance / 1000).toFixed(1)}km`
+                            : `${Math.round(s.distance)}m`}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -903,14 +913,15 @@ export function OmniMap() {
         </div>
       )}
 
-      {/* 상단 중앙: 로고 (메인과 동일 흰색 워드마크) */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/logo.svg"
-        alt="OMNI"
-        className="pointer-events-none absolute left-1/2 top-6 z-40 h-5 -translate-x-1/2 opacity-90"
-        draggable={false}
-      />
+      {/* 상단 중앙: 로고 → 메인으로 */}
+      <a
+        href="/"
+        aria-label="OMNI 메인"
+        className="absolute left-1/2 top-6 z-40 -translate-x-1/2 opacity-90 transition hover:opacity-100"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo.svg" alt="OMNI" className="h-5" draggable={false} />
+      </a>
 
       {/* 검색/명령 입력 — 코어의 채팅 아이콘으로 토글. 열면 유지, ✕로 닫기 */}
       {chatOpen && (
@@ -987,7 +998,10 @@ export function OmniMap() {
           0크기 앵커(정확히 화면 하단중앙)를 기준으로 코어·아크를 절대배치 → 중앙 고정. */}
       {(() => {
         // 설정 아이템 — 코어 위쪽 반원에 등간격.
-        const items = [
+        const items: {
+          key: string; emoji: string; label: string; active: boolean;
+          disabled?: boolean; onClick?: () => void; href?: string;
+        }[] = [
           {
             key: "chat", emoji: "💬", label: "입력", active: chatOpen,
             onClick: () => {
@@ -1006,14 +1020,13 @@ export function OmniMap() {
             ? [{ key: "mic", emoji: "🎙", label: micOn ? "듣는중" : "명령", active: micOn, onClick: () => setMicOn((v) => !v) }]
             : []),
           { key: "hand", emoji: "✋", label: "핸드", active: camOn, onClick: () => setCamOn((v) => !v) },
-          { key: "omni", emoji: "⌂", label: "OMNI", active: false, href: "/" },
         ];
         const R = 128; // 아크 반경(간격 넓게)
-        const start = -168,
-          end = -12; // 위쪽 반원 각도 폭
+        const start = -160,
+          end = -20; // 위쪽 반원 각도 폭
         return (
           // 전체폭 flex로 코어 박스를 확실히 가로 중앙에 둔다 (메인 페이지와 동일 패턴).
-          <div className="pointer-events-none absolute inset-x-0 bottom-16 z-40 flex justify-center">
+          <div className="pointer-events-none absolute inset-x-0 bottom-20 z-40 flex justify-center">
             <div className="relative h-[76px] w-[76px]">
               {/* 반원 아크 아이템 — 코어 박스 중심 기준 */}
               {items.map((it, i) => {
@@ -1058,7 +1071,7 @@ export function OmniMap() {
               <button
                 onClick={() => setMenuOpen((v) => !v)}
                 aria-label="OMNI 코어"
-                className="pointer-events-auto grid h-[76px] w-[76px] place-items-center rounded-full"
+                className="pointer-events-auto relative grid h-[76px] w-[76px] place-items-center rounded-full"
                 style={{ filter: "drop-shadow(0 0 18px rgba(56,189,248,0.4))" }}
               >
                 <GradientOrb

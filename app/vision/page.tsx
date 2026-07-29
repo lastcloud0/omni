@@ -203,14 +203,15 @@ export default function VisionPage() {
         />
       )}
 
-      {/* 상단 중앙: 로고 (메인·맵과 동일) */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/logo.svg"
-        alt="OMNI"
-        className="pointer-events-none absolute left-1/2 top-6 z-40 h-5 -translate-x-1/2 opacity-90"
-        draggable={false}
-      />
+      {/* 상단 중앙: 로고 → 메인으로 */}
+      <a
+        href="/"
+        aria-label="OMNI 메인"
+        className="absolute left-1/2 top-6 z-40 -translate-x-1/2 opacity-90 transition hover:opacity-100"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo.svg" alt="OMNI" className="h-5" draggable={false} />
+      </a>
 
       {/* 하단 중앙: OMNI 코어 + 탭 시 반원 설정 아크 (맵과 동일 패턴) */}
       {(() => {
@@ -225,11 +226,10 @@ export default function VisionPage() {
             onClick: () => { setManageOpen((v) => !v); setMenuOpen(false); },
           },
           { key: "map", emoji: "🗺", label: "MAP", active: false, href: "/map" },
-          { key: "omni", emoji: "⌂", label: "OMNI", active: false, href: "/" },
         ];
         const R = 122;
-        const start = -164,
-          end = -16;
+        const start = -158,
+          end = -22;
         return (
           <div className="pointer-events-none absolute inset-x-0 bottom-16 z-40 flex justify-center">
             <div className="relative h-[76px] w-[76px]">
@@ -264,7 +264,7 @@ export default function VisionPage() {
               <button
                 onClick={() => setMenuOpen((v) => !v)}
                 aria-label="OMNI 코어"
-                className="pointer-events-auto grid h-[76px] w-[76px] place-items-center rounded-full"
+                className="pointer-events-auto relative grid h-[76px] w-[76px] place-items-center rounded-full"
                 style={{ filter: "drop-shadow(0 0 18px rgba(56,189,248,0.4))" }}
               >
                 <GradientOrb className="pointer-events-none" config={{ hue: 0, rotationSpeed: 0.3 }} />
