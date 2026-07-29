@@ -90,10 +90,14 @@ export default function Home() {
 
   return (
     <main className="relative mx-auto flex min-h-screen w-full max-w-2xl flex-col items-center justify-between px-4 py-8 sm:px-5 sm:py-10">
-      {/* 네임 — 상단 중앙 */}
-      <span className="absolute left-1/2 top-6 -translate-x-1/2 text-[13px] font-light tracking-[0.5em] text-sky-300/80">
-        O M N I
-      </span>
+      {/* 네임 — 상단 중앙 (흰색 워드마크 SVG) */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/logo.svg"
+        alt="OMNI"
+        className="absolute left-1/2 top-7 h-5 -translate-x-1/2 opacity-90 select-none"
+        draggable={false}
+      />
 
       {/* 중앙: 구체 + 세포분열 미니코어 위성 메뉴 */}
       <section className="flex flex-1 items-center justify-center">
