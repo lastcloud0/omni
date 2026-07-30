@@ -46,6 +46,7 @@ export function MiniOrb({ label, size = 60, active = false, mounted = true }: Pr
         width: size,
         height: size,
         lineHeight: 0,
+        opacity: 0.8,
         transform: active ? "scale(1.06)" : undefined,
         transition: "transform 160ms ease",
         filter: "drop-shadow(0 0 8px rgba(56,189,248,0.4))",

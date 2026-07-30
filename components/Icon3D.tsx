@@ -38,9 +38,9 @@ function Extruded({ url, color }: { url: string; color: string }) {
     box.getCenter(center);
     const size = new THREE.Vector3();
     box.getSize(size);
-    // XY 기준 정규화(깊이 제외) → 프레임을 꽉 채우되 비율 유지.
+    // XY 기준 정규화(깊이 제외). 값 줄여 프레임에 여백 → 회전해도 안 잘림.
     const maxDim = Math.max(size.x, size.y) || 1;
-    return { geometries: geos, offset: center, scale: 2.35 / maxDim };
+    return { geometries: geos, offset: center, scale: 1.85 / maxDim };
   }, [data]);
 
   useFrame((state) => {
