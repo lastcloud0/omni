@@ -282,14 +282,18 @@ export function OmniMap() {
       map.on("mouseleave", id, onLeave);
       map.on("click", id, onPoiClick);
     }
-    // 빈 곳(POI 아님) 클릭 시 카드 닫기.
+    // 빈 곳(POI 아님) 클릭 시 카드 닫기 + 아크 메뉴 닫기.
     map.on("click", (e) => {
       const hits = map.queryRenderedFeatures(e.point, { layers: POI_LAYERS });
       if (!hits.length) setCard(null);
+      setMenuOpen(false); // 배경 클릭 → 아크 닫힘
     });
 
-    // 사용자가 지도를 직접 조작하면 경로 카메라 무빙을 멈춘다.
-    const cancelFly = () => (flyRef.current.cancel = true);
+    // 사용자가 지도를 직접 조작하면 경로 카메라 무빙 멈춤 + 아크 닫힘.
+    const cancelFly = () => {
+      flyRef.current.cancel = true;
+      setMenuOpen(false); // 드래그/휠 → 아크 닫힘
+    };
     map.on("dragstart", cancelFly);
     map.on("wheel", cancelFly);
 
@@ -410,6 +414,28 @@ export function OmniMap() {
         { enableHighAccuracy: true, timeout: 8000 }
       );
     });
+
+  /** 현위치로 이동 + 마커 표시. */
+  const myLocMarker = useRef<Marker | null>(null);
+  const goToMyLocation = async () => {
+    setVoiceHint("현위치 확인 중…");
+    const loc = await getMyLocation();
+    if (!loc) {
+      setVoiceHint("위치 권한이 필요합니다");
+      return;
+    }
+    const map = mapRef.current;
+    if (!map) return;
+    myLocMarker.current?.remove();
+    const el = document.createElement("div");
+    el.className = "omni-here"; // 파란 펄스 점 (globals.css)
+    myLocMarker.current = new maplibregl.Marker({ element: el })
+      .setLngLat(loc)
+      .addTo(map);
+    autoTilted.current = true;
+    map.flyTo({ center: loc, zoom: 16, pitch: TILT, duration: 2000, essential: true });
+    setVoiceHint("현위치");
+  };
 
   /** 경로 전체를 3D로 담은 뒤, 경로를 따라 카메라가 훑는다 (팔란티어풍). */
   const flyAlongRoute = (coords: [number, number][]) => {
@@ -1025,6 +1051,7 @@ export function OmniMap() {
               setMenuOpen(false);
             },
           },
+          { key: "locate", emoji: "🎯", label: "현위치", active: false, onClick: goToMyLocation },
           { key: "tilt", emoji: pitch > 10 ? "◨" : "▭", label: "기울이기", active: pitch > 10, onClick: toggleTilt },
           { key: "home", emoji: "🌐", label: "지구본", active: false, onClick: goHome },
           {
@@ -1049,13 +1076,10 @@ export function OmniMap() {
                 const deg = items.length > 1 ? start + (i * (end - start)) / (items.length - 1) : -90;
                 const dx = Math.round(R * Math.cos((deg * Math.PI) / 180));
                 const dy = Math.round(R * Math.sin((deg * Math.PI) / 180));
-                const common = {
+                const disabled = "disabled" in it && it.disabled;
+                const wrap = {
                   title: it.label,
-                  className: `absolute left-1/2 top-1/2 grid h-12 w-12 place-items-center rounded-full border text-[18px] transition-all duration-300 ${
-                    it.active
-                      ? "border-sky-400/70 bg-sky-400/25 text-sky-100"
-                      : "border-white/15 bg-black/40 text-slate-200 hover:border-sky-400/50"
-                  } ${"disabled" in it && it.disabled ? "opacity-30" : ""}`,
+                  className: "absolute left-1/2 top-1/2 flex flex-col items-center gap-1 transition-all duration-300",
                   style: {
                     transform: menuOpen
                       ? `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(1)`
@@ -1063,23 +1087,39 @@ export function OmniMap() {
                     opacity: menuOpen ? 1 : 0,
                     pointerEvents: (menuOpen ? "auto" : "none") as "auto" | "none",
                     transitionDelay: `${(menuOpen ? i : items.length - i) * 30}ms`,
-                    backdropFilter: "blur(8px)",
                   } as React.CSSProperties,
                 };
+                const inner = (
+                  <>
+                    <span
+                      className={`grid h-12 w-12 place-items-center rounded-full border text-[18px] ${
+                        it.active
+                          ? "border-sky-400/70 bg-sky-400/25 text-sky-100"
+                          : "border-white/15 bg-black/40 text-slate-200"
+                      } ${disabled ? "opacity-30" : ""}`}
+                      style={{ backdropFilter: "blur(8px)" }}
+                    >
+                      {it.emoji}
+                    </span>
+                    <span className="whitespace-nowrap text-[9px] tracking-wide text-slate-300">
+                      {it.label}
+                    </span>
+                  </>
+                );
                 return it.href ? (
-                  <a key={it.key} href={it.href} {...common}>
-                    {it.emoji}
+                  <a key={it.key} href={it.href} {...wrap}>
+                    {inner}
                   </a>
                 ) : (
                   <button
                     key={it.key}
                     onClick={() => {
-                      if (!("disabled" in it && it.disabled)) it.onClick?.();
+                      if (!disabled) it.onClick?.();
                       setMenuOpen(false); // 작동 후 아크 닫힘
                     }}
-                    {...common}
+                    {...wrap}
                   >
-                    {it.emoji}
+                    {inner}
                   </button>
                 );
               })}

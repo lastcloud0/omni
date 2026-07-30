@@ -128,6 +128,22 @@ body {
   100% { box-shadow: 0 0 0 3px rgba(56, 189, 248, 0), 0 0 14px rgba(56, 189, 248, 0.8); }
 }
 
+/* ── MAP: 현위치 파란 펄스 점 ──────────────────────────────── */
+.omni-here {
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: #3b82f6;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3), 0 0 14px rgba(59, 130, 246, 0.9);
+  animation: omni-here-pulse 1.8s ease-out infinite;
+}
+@keyframes omni-here-pulse {
+  0% { box-shadow: 0 0 0 3px rgba(59,130,246,0.4), 0 0 12px rgba(59,130,246,0.8); }
+  70% { box-shadow: 0 0 0 14px rgba(59,130,246,0), 0 0 18px rgba(59,130,246,0.4); }
+  100% { box-shadow: 0 0 0 3px rgba(59,130,246,0), 0 0 12px rgba(59,130,246,0.8); }
+}
+
 /* ── MAP: MapLibre 기본 컨트롤을 다크 글래스로 ──────────────── */
 .maplibregl-ctrl-group {
   background: rgba(255, 255, 255, 0.06) !important;

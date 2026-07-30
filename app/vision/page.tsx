@@ -237,13 +237,9 @@ export default function VisionPage() {
                 const deg = start + (i * (end - start)) / (items.length - 1);
                 const dx = Math.round(R * Math.cos((deg * Math.PI) / 180));
                 const dy = Math.round(R * Math.sin((deg * Math.PI) / 180));
-                const common = {
+                const wrap = {
                   title: it.label,
-                  className: `absolute left-1/2 top-1/2 grid h-12 w-12 place-items-center rounded-full border text-[18px] transition-all duration-300 ${
-                    it.active
-                      ? "border-sky-400/70 bg-sky-400/25 text-sky-100"
-                      : "border-white/15 bg-black/40 text-slate-200 hover:border-sky-400/50"
-                  }`,
+                  className: "absolute left-1/2 top-1/2 flex flex-col items-center gap-1 transition-all duration-300",
                   style: {
                     transform: menuOpen
                       ? `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(1)`
@@ -251,18 +247,34 @@ export default function VisionPage() {
                     opacity: menuOpen ? 1 : 0,
                     pointerEvents: (menuOpen ? "auto" : "none") as "auto" | "none",
                     transitionDelay: `${(menuOpen ? i : items.length - i) * 30}ms`,
-                    backdropFilter: "blur(8px)",
                   } as React.CSSProperties,
                 };
+                const inner = (
+                  <>
+                    <span
+                      className={`grid h-12 w-12 place-items-center rounded-full border text-[18px] ${
+                        it.active
+                          ? "border-sky-400/70 bg-sky-400/25 text-sky-100"
+                          : "border-white/15 bg-black/40 text-slate-200"
+                      }`}
+                      style={{ backdropFilter: "blur(8px)" }}
+                    >
+                      {it.emoji}
+                    </span>
+                    <span className="whitespace-nowrap text-[9px] tracking-wide text-slate-300">
+                      {it.label}
+                    </span>
+                  </>
+                );
                 return it.href ? (
-                  <a key={it.key} href={it.href} {...common}>{it.emoji}</a>
+                  <a key={it.key} href={it.href} {...wrap}>{inner}</a>
                 ) : (
                   <button
                     key={it.key}
                     onClick={() => { it.onClick?.(); setMenuOpen(false); }}
-                    {...common}
+                    {...wrap}
                   >
-                    {it.emoji}
+                    {inner}
                   </button>
                 );
               })}
