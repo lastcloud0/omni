@@ -49,7 +49,14 @@ export function MiniOrb({ label, size = 60, active = false, mounted = true }: Pr
         opacity: 0.8,
         transform: active ? "scale(1.06)" : undefined,
         transition: "transform 160ms ease",
-        filter: "drop-shadow(0 0 8px rgba(56,189,248,0.4))",
+        // 글래스모피즘 타일 (아이콘 뒤 프리즈드 글래스). white 0.25는 다크UI에서
+        // 밝아 0.14로 톤다운 — 원하면 올리면 됨.
+        background: "rgba(255,255,255,0.14)",
+        backdropFilter: "blur(10px)",
+        WebkitBackdropFilter: "blur(10px)",
+        borderRadius: 16,
+        border: "1px solid rgba(255,255,255,0.18)",
+        boxShadow: "0px 8px 32px rgba(31,38,135,0.37)",
       }}
     >
       {mounted ? (
