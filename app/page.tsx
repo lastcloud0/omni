@@ -152,9 +152,11 @@ export default function Home() {
           })().map((b, i) => {
             const common = {
               initial: false as const,
+              // scale은 넣지 않는다: R3F가 마운트 시 축소된 크기로 측정해 아이콘이 작아지는 버그.
+              // 위치(spring) + 투명도만으로 "코어에서 솟아나는" 연출.
               animate: menu
-                ? { x: b.dx, y: b.dy, scale: 1, opacity: 1 }
-                : { x: 0, y: 0, scale: 0.2, opacity: 0 },
+                ? { x: b.dx, y: b.dy, opacity: 1 }
+                : { x: 0, y: 0, opacity: 0 },
               transition: { type: "spring" as const, stiffness: 280, damping: 22, delay: i * 0.05 },
               style: {
                 marginLeft: -32, // 버튼(64) 절반 보정 → 중심이 코어 중심에 일치
