@@ -257,7 +257,13 @@ export default function VisionPage() {
                 return it.href ? (
                   <a key={it.key} href={it.href} {...common}>{it.emoji}</a>
                 ) : (
-                  <button key={it.key} onClick={it.onClick} {...common}>{it.emoji}</button>
+                  <button
+                    key={it.key}
+                    onClick={() => { it.onClick?.(); setMenuOpen(false); }}
+                    {...common}
+                  >
+                    {it.emoji}
+                  </button>
                 );
               })}
 

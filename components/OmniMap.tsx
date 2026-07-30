@@ -19,6 +19,7 @@ import { createGestureReader } from "@/lib/handGesture";
 import type { HandFrame } from "@/hooks/useHandTracking";
 import { GradientOrb } from "@/components/GradientOrb";
 import { useAudioLevel } from "@/hooks/useAudioLevel";
+import { useDraggable } from "@/hooks/useDraggable";
 import {
   fetchRoute,
   formatRoute,
@@ -91,6 +92,8 @@ export function OmniMap() {
   const [menuOpen, setMenuOpen] = useState(false); // 코어 탭 → 반원 설정 아크
   const [chatOpen, setChatOpen] = useState(false); // 코어→채팅 아이콘 → 입력창
   const [routeExpanded, setRouteExpanded] = useState(false); // 경로 회전안내 펼침
+  // 경로 정보박스 위치 — 드래그로 이동 가능.
+  const routeDrag = useDraggable({ initial: { x: 12, y: 72, w: 280, h: 150 } });
 
   // 코어 음성반응 — 마이크 켜졌을 때 오디오 레벨로 맥동.
   const { level: audioLevel } = useAudioLevel(micOn);
@@ -815,16 +818,29 @@ export function OmniMap() {
         </div>
       )}
 
-      {/* 경로 정보 박스 — 모바일에선 컴팩트(접힘), 데스크톱은 넓게 */}
+      {/* 경로 정보 박스 — 드래그로 위치 이동 가능. 모바일 컴팩트(접힘) */}
       {route?.result && !route.loading && !route.error && (
-        <div className="glass absolute left-2 top-16 z-40 w-[min(72vw,270px)] rounded-2xl p-3 sm:left-3 sm:top-20 sm:w-[300px] sm:p-3.5">
+        <div
+          className="glass absolute z-40 w-[min(72vw,270px)] rounded-2xl p-3 sm:w-[300px] sm:p-3.5"
+          style={{ left: routeDrag.box.x, top: routeDrag.box.y, touchAction: "none" }}
+        >
           <div className="mb-2 flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <div className="text-[10px] tracking-wider text-sky-300/80">
-                {route.mode === "walking" ? "🚶 도보" : "🚗 자동차"}
-              </div>
-              <div className="truncate text-[14px] font-medium text-sky-50">
-                {route.destName || "목적지"}까지
+            {/* 드래그 핸들 겸 헤더 */}
+            <div {...routeDrag.dragProps} className="flex min-w-0 items-center gap-2 select-none">
+              <span className="text-slate-500" aria-label="이동">
+                <svg width="9" height="15" viewBox="0 0 10 16" fill="currentColor">
+                  <circle cx="2.5" cy="3" r="1.2" /><circle cx="7.5" cy="3" r="1.2" />
+                  <circle cx="2.5" cy="8" r="1.2" /><circle cx="7.5" cy="8" r="1.2" />
+                  <circle cx="2.5" cy="13" r="1.2" /><circle cx="7.5" cy="13" r="1.2" />
+                </svg>
+              </span>
+              <div className="min-w-0">
+                <div className="text-[10px] tracking-wider text-sky-300/80">
+                  {route.mode === "walking" ? "🚶 도보" : "🚗 자동차"}
+                </div>
+                <div className="truncate text-[14px] font-medium text-sky-50">
+                  {route.destName || "목적지"}까지
+                </div>
               </div>
             </div>
             <button
@@ -983,9 +999,9 @@ export function OmniMap() {
         </div>
       )}
 
-      {/* OMNI 자막 — 음성 받아쓰기(마이크) 또는 명령 해석 결과(음성·텍스트 공통) */}
+      {/* OMNI 자막 — 코어 위쪽으로 올려 코어와 겹치지 않게 */}
       {((micOn && micInterim) || voiceHint) && (
-        <div className="pointer-events-none absolute bottom-24 left-1/2 z-40 max-w-[86vw] -translate-x-1/2 rounded-full bg-black/60 px-4 py-1.5 text-center text-[13px] backdrop-blur-sm">
+        <div className="pointer-events-none absolute bottom-52 left-1/2 z-40 max-w-[86vw] -translate-x-1/2 rounded-full bg-black/60 px-4 py-1.5 text-center text-[13px] backdrop-blur-sm">
           {micOn && micInterim ? (
             <span className="text-sky-200/90">“{micInterim}”</span>
           ) : (
@@ -1059,6 +1075,7 @@ export function OmniMap() {
                     key={it.key}
                     onClick={() => {
                       if (!("disabled" in it && it.disabled)) it.onClick?.();
+                      setMenuOpen(false); // 작동 후 아크 닫힘
                     }}
                     {...common}
                   >
