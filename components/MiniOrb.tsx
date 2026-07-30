@@ -1,11 +1,13 @@
 "use client";
 
+import { Icon3D } from "@/components/Icon3D";
+
 interface Props {
   label: string;
   size?: number;
-  /** 강조(활성) — 글로우/크기 강화. */
+  /** 강조(활성) — 크기 강화. */
   active?: boolean;
-  /** 메인 오브(GradientOrb)와 색 맞추는 hue 회전값(도). */
+  /** (구버전 호환용, 현재 3D 아이콘에선 미사용) */
   hue?: number;
 }
 
@@ -16,49 +18,34 @@ const ICON_SRC: Record<string, string> = {
   CHAT: "/icon-chat.svg",
 };
 
-/** 3개 아이콘이 각기 다른 위상으로 부유하도록 음수 딜레이. */
-const FLOAT_DELAY: Record<string, string> = {
-  VISION: "0s",
-  MAP: "-1.7s",
-  CHAT: "-3.4s",
+/** 라벨 → 3D 재질 색 (SVG 그라디언트 톤에 맞춤: 보라→파랑). */
+const ICON_COLOR: Record<string, string> = {
+  VISION: "#c394f7",
+  MAP: "#8fb0ff",
+  CHAT: "#a9b6ff",
 };
 
 /**
- * 위성 메뉴 버튼 본체 — 사용자 제공 SVG 아이콘. 원형 판 없이 아이콘만 떠 있는 룩.
- * 네온 글로우 + hue 회전으로 메인 오브 상태색을 따라간다.
+ * 위성 메뉴 버튼 본체 — SVG를 실제 3D로 압출한 아이콘(Icon3D).
+ * 천천히 회전·부유한다. (glb 받으면 Icon3D 내부만 교체)
  */
-export function MiniOrb({ label, size = 60, active = false, hue = 0 }: Props) {
-  const src = ICON_SRC[label.toUpperCase()];
+export function MiniOrb({ label, size = 60, active = false }: Props) {
+  const key = label.toUpperCase();
+  const src = ICON_SRC[key];
   if (!src) return null;
   return (
     <span
-      className="relative inline-grid place-items-center"
+      className="relative block"
       style={{
         width: size,
         height: size,
-        filter: hue ? `hue-rotate(${hue}deg)` : undefined,
+        lineHeight: 0,
         transform: active ? "scale(1.06)" : undefined,
         transition: "transform 160ms ease",
-        perspective: 420, // 3D 부유 원근
+        filter: "drop-shadow(0 0 8px rgba(56,189,248,0.4))",
       }}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={src}
-        alt={label}
-        draggable={false}
-        className="omni-float3d"
-        style={{
-          width: size,
-          height: size,
-          transformStyle: "preserve-3d",
-          animation: "omni-float3d 5.2s ease-in-out infinite",
-          animationDelay: FLOAT_DELAY[label.toUpperCase()] ?? "0s",
-          // 부양감 글로우
-          filter:
-            "drop-shadow(0 0 6px rgba(56,189,248,0.75)) drop-shadow(0 3px 5px rgba(0,10,25,0.5))",
-        }}
-      />
+      <Icon3D src={src} color={ICON_COLOR[key] ?? "#a9b6ff"} size={size} />
     </span>
   );
 }
