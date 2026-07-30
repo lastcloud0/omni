@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { useOmni, type CtaAction } from "@/hooks/useOmni";
@@ -69,6 +69,15 @@ export default function Home() {
   levelRef.current = level; // 셰이더 오브에 음성 레벨 전달(리렌더 없이)
   const [draft, setDraft] = useState("");
   const [menu, setMenu] = useState(false); // 구체 호버/터치 시 위성 메뉴
+  // 데스크톱/모바일 중 한 세트만 렌더 → WebGL 컨텍스트 절반으로.
+  const [isDesktop, setIsDesktop] = useState(true);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 640px)");
+    const on = () => setIsDesktop(mq.matches);
+    on();
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
   const closeT = useRef<ReturnType<typeof setTimeout> | null>(null);
   const openMenu = () => {
     if (closeT.current) clearTimeout(closeT.current);
@@ -152,36 +161,39 @@ export default function Home() {
                 marginTop: -32,
                 pointerEvents: (menu ? "auto" : "none") as "auto" | "none",
               },
-              className: "absolute left-1/2 top-1/2 z-20 hidden sm:block",
+              className: "absolute left-1/2 top-1/2 z-20 block",
             };
+            if (!isDesktop) return null; // 모바일은 아래 별도 블록
             return b.href ? (
               <motion.a key={b.label} href={b.href} {...common}>
-                <MiniOrb label={b.label} size={64} hue={STATUS_HUE[status] ?? 0} />
+                <MiniOrb label={b.label} size={64} mounted={menu} />
               </motion.a>
             ) : (
               <motion.button key={b.label} onClick={b.onClick} {...common}>
-                <MiniOrb label={b.label} size={64} hue={STATUS_HUE[status] ?? 0} />
+                <MiniOrb label={b.label} size={64} mounted={menu} />
               </motion.button>
             );
           })}
 
-          {/* 모바일: 구체 아래 미니코어 2개 (코어 중심 기준 아래로) */}
-          <div
-            className={`absolute left-1/2 top-1/2 z-20 flex gap-4 transition-opacity duration-300 sm:hidden ${
-              menu ? "opacity-100" : "pointer-events-none opacity-0"
-            }`}
-            style={{ transform: "translate(-50%, 160px)" }}
-          >
-            <button onClick={() => { setChatOpen(true); if (!awake) toggleAwake(); }}>
-              <MiniOrb label="CHAT" size={60} hue={STATUS_HUE[status] ?? 0} />
-            </button>
-            <a href="/map">
-              <MiniOrb label="MAP" size={60} hue={STATUS_HUE[status] ?? 0} />
-            </a>
-            <a href="/vision">
-              <MiniOrb label="VISION" size={60} hue={STATUS_HUE[status] ?? 0} />
-            </a>
-          </div>
+          {/* 모바일: 구체 아래 미니코어 (코어 중심 기준 아래로) */}
+          {!isDesktop && (
+            <div
+              className={`absolute left-1/2 top-1/2 z-20 flex gap-4 transition-opacity duration-300 ${
+                menu ? "opacity-100" : "pointer-events-none opacity-0"
+              }`}
+              style={{ transform: "translate(-50%, 160px)" }}
+            >
+              <button onClick={() => { setChatOpen(true); if (!awake) toggleAwake(); }}>
+                <MiniOrb label="CHAT" size={60} mounted={menu} />
+              </button>
+              <a href="/map">
+                <MiniOrb label="MAP" size={60} mounted={menu} />
+              </a>
+              <a href="/vision">
+                <MiniOrb label="VISION" size={60} mounted={menu} />
+              </a>
+            </div>
+          )}
 
           {/* 받아쓰기 / 응답 자막 — "옴니" 활성화 후에만 표시 */}
           {interacted && (

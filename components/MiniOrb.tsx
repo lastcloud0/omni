@@ -9,6 +9,12 @@ interface Props {
   active?: boolean;
   /** (구버전 호환용, 현재 3D 아이콘에선 미사용) */
   hue?: number;
+  /**
+   * 3D 캔버스를 실제로 마운트할지. 메뉴가 열려 보일 때만 true로 주면,
+   * R3F가 정확한 컨테이너 크기를 측정하고 WebGL 컨텍스트도 그때만 쓴다.
+   * false면 캔버스를 안 만든다(닫힘 상태 = 컨텍스트 0).
+   */
+  mounted?: boolean;
 }
 
 /** 라벨 → public 아이콘 파일. */
@@ -29,7 +35,7 @@ const ICON_COLOR: Record<string, string> = {
  * 위성 메뉴 버튼 본체 — SVG를 실제 3D로 압출한 아이콘(Icon3D).
  * 천천히 회전·부유한다. (glb 받으면 Icon3D 내부만 교체)
  */
-export function MiniOrb({ label, size = 60, active = false }: Props) {
+export function MiniOrb({ label, size = 60, active = false, mounted = true }: Props) {
   const key = label.toUpperCase();
   const src = ICON_SRC[key];
   if (!src) return null;
@@ -45,7 +51,13 @@ export function MiniOrb({ label, size = 60, active = false }: Props) {
         filter: "drop-shadow(0 0 8px rgba(56,189,248,0.4))",
       }}
     >
-      <Icon3D src={src} color={ICON_COLOR[key] ?? "#a9b6ff"} size={size} />
+      {mounted ? (
+        <Icon3D src={src} color={ICON_COLOR[key] ?? "#a9b6ff"} size={size} />
+      ) : (
+        // 닫힘/대기 상태: 캔버스 없이 평면 아이콘 (컨텍스트 0)
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt={label} width={size} height={size} draggable={false} />
+      )}
     </span>
   );
 }
