@@ -1064,9 +1064,10 @@ export function OmniMap() {
             : []),
           { key: "hand", emoji: "✋", label: "핸드", active: camOn, onClick: () => setCamOn((v) => !v) },
         ];
-        const R = 128; // 아크 반경(간격 넓게)
-        const start = -160,
-          end = -20; // 위쪽 반원 각도 폭
+        // 아이템 수에 따라 반경을 키워 간격 확보(겹침 방지). 라벨 폭까지 고려.
+        const R = 118 + items.length * 8; // 8개면 ~182
+        const start = -174,
+          end = -6; // 위쪽 반원 거의 꽉 채움
         return (
           // 전체폭 flex로 코어 박스를 확실히 가로 중앙에 둔다 (메인 페이지와 동일 패턴).
           <div className="pointer-events-none absolute inset-x-0 bottom-20 z-40 flex justify-center">
